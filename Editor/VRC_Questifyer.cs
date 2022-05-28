@@ -32,14 +32,15 @@ public class VRC_Questifyer : EditorWindow
     string createFormFieldValue1 = "";
     string createFormFieldValue2 = "";
     bool isDryRun = false;
-
+    bool autoCreateQuestMaterials = true;
+    bool placeQuestMaterialsInOwnDirectory = true;
     enum Types {
         SwitchToMaterial,
         RemoveGameObject
     }
-
     List<Action> actionsToPerform = new List<Action>();
     List<System.Exception> errors = new List<System.Exception>();
+    Dictionary<string, Material> knownMaterials = new Dictionary<string, Material>();
 
     [MenuItem("PeanutTools/VRC Questifyer _%#T")]
     public static void ShowWindow()
@@ -91,7 +92,25 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.Space();
         
-        GUILayout.Label("Step 3: Questify!");
+        GUILayout.Label("Step 3: Configure settings");
+
+        EditorGUILayout.Space();
+        
+        float originalValue = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 500;
+
+        autoCreateQuestMaterials = EditorGUILayout.Toggle("Create missing Quest materials", autoCreateQuestMaterials);
+        GUILayout.Label("Will use Standard Lite");
+
+        placeQuestMaterialsInOwnDirectory = EditorGUILayout.Toggle("Place created Quest materials in a directory named \"Quest\"", placeQuestMaterialsInOwnDirectory);
+        GUILayout.Label("Recommended to keep your files tidy");
+
+        EditorGUIUtility.labelWidth = originalValue;
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        GUILayout.Label("Step 4: Questify!");
         
         EditorGUILayout.Space();
         EditorGUILayout.Space();
@@ -140,7 +159,11 @@ public class VRC_Questifyer : EditorWindow
         GUILayout.Label("Errors:");
 
         foreach (System.Exception exception in errors) {
-            GUILayout.Label(exception.Message);
+            if (exception is MaterialNotFoundException) {
+                GUILayout.Label("Could not find either a quest version for material " + (exception as MaterialNotFoundException).pathToMaterial);
+            } else {
+                GUILayout.Label(exception.Message);
+            }
         }
     }
 
@@ -470,9 +493,11 @@ public class VRC_Questifyer : EditorWindow
             return existingObject;
         }
 
-        GameObject clone = Instantiate(sourceAvatar.gameObject, new Vector3(-3, 0, 0), new Quaternion(0, 0, 0, 1));
+        GameObject clone = Instantiate(sourceAvatar.gameObject);
         clone.name = questAvatarName;
+        clone.SetActive(true);
 
+        sourceAvatar.transform.position = new Vector3(sourceAvatar.transform.position.x - 3, sourceAvatar.transform.position.y, sourceAvatar.transform.position.z);
         sourceAvatar.gameObject.SetActive(false);
 
         return clone;
@@ -490,10 +515,33 @@ public class VRC_Questifyer : EditorWindow
         }
     }
 
+    Material GetMaterialAtPath(string pathToMaterial, bool ignoreNotFound = false) {
+        if (knownMaterials.ContainsKey(pathToMaterial)) {
+            return knownMaterials[pathToMaterial];
+        }
+
+        Material loadedMaterial = (Material)AssetDatabase.LoadAssetAtPath(pathToMaterial, typeof(Material));
+
+        if (loadedMaterial == null) {
+            if (ignoreNotFound) {
+                return null;
+            }
+            throw new System.Exception("Failed to load material at path: " + pathToMaterial);
+        }
+
+        knownMaterials[pathToMaterial] = loadedMaterial;
+
+        return loadedMaterial;
+    }
+
+    Material LooselyGetMaterialAtPath(string pathToMaterial) {
+        return GetMaterialAtPath(pathToMaterial, true);
+    }
+
     void SwitchMeshToQuestMaterialsForAvatar(GameObject avatar, Renderer renderer) {
         string pathToGameObject = Utils.GetGameObjectPath(renderer.gameObject);
 
-        Debug.Log("Switching all materials for mesh " + pathToGameObject + "...");
+        Debug.Log("Switching all materials for renderer " + pathToGameObject + "...");
 
         Material[] materials = renderer.sharedMaterials;
 
@@ -519,19 +567,29 @@ public class VRC_Questifyer : EditorWindow
 
                 string pathToQuestMaterial = pathToMaterial.Replace(".mat", " Quest.mat");
 
-                Material questMaterial = (Material)AssetDatabase.LoadAssetAtPath(pathToQuestMaterial, typeof(Material));
+                Material questMaterial = LooselyGetMaterialAtPath(pathToQuestMaterial);
 
                 if (questMaterial != null) {
                     newMaterials[idx] = questMaterial;
                 } else {
-                    string pathToQuestMaterialParent = Directory.GetParent(pathToMaterial).FullName.Replace(Path.GetFullPath(Application.dataPath), "Assets");
+                    string pathToQuestMaterialParent = Utils.GetDirectoryPathRelativeToAssets(pathToMaterial);
 
                     string pathToQuestMaterialInQuestFolder = Path.Combine(pathToQuestMaterialParent, "Quest", Path.GetFileName(pathToMaterial).Replace(".mat", " Quest.mat"));
 
-                    Material questMaterialInFolder = (Material)AssetDatabase.LoadAssetAtPath(pathToQuestMaterialInQuestFolder, typeof(Material));
+                    Debug.Log("Looking for a quest folder version: " + pathToQuestMaterialInQuestFolder);
+
+                    Material questMaterialInFolder = LooselyGetMaterialAtPath(pathToQuestMaterialInQuestFolder);
 
                     if (questMaterialInFolder == null) {
-                        throw new System.Exception("Could not find either a quest version for material " + pathToMaterial);
+                        if (autoCreateQuestMaterials) {
+                            if (isDryRun == false) {
+                                questMaterialInFolder = CreateMissingQuestMaterialForRenderer(pathToMaterial, material);
+                            }
+                        } else {
+                            throw new MaterialNotFoundException() {
+                                pathToMaterial = pathToQuestMaterialInQuestFolder
+                            };
+                        }
                     }
 
                     pathToQuestMaterial = pathToQuestMaterialInQuestFolder;
@@ -545,12 +603,48 @@ public class VRC_Questifyer : EditorWindow
                 });
             } catch (System.Exception exception) {
                 errors.Add(exception);
+                throw exception;
             }
         }
 
         if (isDryRun == false) {
             renderer.sharedMaterials = newMaterials;
         }
+    }
+
+    Material CreateMissingQuestMaterialForRenderer(string originalMaterialPath, Material originalMaterial) {
+        Debug.Log("Creating missing Quest material for renderer for material: " + originalMaterialPath);
+
+        string pathToMaterialTemplate = "Assets/PeanutTools/VRC_Questifyer/Materials/QuestTemplate.mat";
+        Material materialTemplate = GetMaterialAtPath(pathToMaterialTemplate);
+
+        string pathToParentDir = Utils.GetDirectoryPathRelativeToAssets(originalMaterialPath);
+
+        string pathToNewParentDir = pathToParentDir + "/" + (placeQuestMaterialsInOwnDirectory ? "Quest/" : "");
+
+        string pathToDest = pathToNewParentDir + Path.GetFileName(originalMaterialPath).Replace(".mat", " Quest.mat");
+
+        if (placeQuestMaterialsInOwnDirectory) {
+            bool exists = Directory.Exists(pathToNewParentDir);
+
+            if(!exists) {
+                Directory.CreateDirectory(pathToNewParentDir);
+            }
+        }
+
+        bool result = AssetDatabase.CopyAsset(pathToMaterialTemplate, pathToDest);
+
+        if (result == false) {
+            throw new System.Exception("Failed to copy Quest material template!");
+        }
+
+        Material createdMaterial = GetMaterialAtPath(pathToDest);
+        
+        Texture albedoTexture = originalMaterial.GetTexture("_MainTex");
+
+        createdMaterial.SetTexture("_MainTex", albedoTexture);
+
+        return createdMaterial;
     }
 
     void SwitchMeshByPathToQuestMaterialsForAvatar(GameObject avatar, string pathToMesh) {

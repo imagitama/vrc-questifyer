@@ -18,5 +18,9 @@ namespace VRCQuestifyer {
         public static string GetPathRelativeToAssets(string path) {
             return Path.GetFullPath(path).Replace(Path.GetFullPath(Application.dataPath), "Assets");
         }
+
+        public static string GetDirectoryPathRelativeToAssets(string path) {
+            return GetPathRelativeToAssets(Directory.GetParent(path).FullName);
+        }
     }
 }
