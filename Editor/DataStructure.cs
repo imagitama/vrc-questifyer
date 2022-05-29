@@ -27,6 +27,7 @@ namespace VRCQuestifyer {
     class ActionJson {
         public string type;
         public StringStringDictionary data;
+        public bool performAtEnd;
     }
 
     [Serializable]
@@ -35,11 +36,13 @@ namespace VRCQuestifyer {
     }
 
     class Action {
+        public bool performAtEnd;
     }
 
     class SwitchToMaterialAction : Action {
         public string pathToRenderer;
         public string pathToMaterial;
+        public int materialIndex;
     }
 
     class RemoveGameObjectAction : Action {

@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
 using UnityEditor.Animations;
+using UnityEngine.Rendering;
 using UnityEditorInternal;
 using VRC.SDKBase.Editor;
 using VRC.SDK3.Avatars.Components;
@@ -25,24 +26,31 @@ using VRCQuestifyer;
 
 public class VRC_Questifyer : EditorWindow
 {
+    enum Types {
+        SwitchToMaterial,
+        RemoveGameObject
+    }
+
     VRCAvatarDescriptor sourceVrcAvatarDescriptor;
     List<Action> actions = new List<Action>();
     bool isCreateFormVisible = false;
     int selectedTypeDropdownIdx = 0;
     string createFormFieldValue1 = "";
     string createFormFieldValue2 = "";
+    int createFormFieldValue3 = 0;
     bool isDryRun = false;
-    bool autoCreateQuestMaterials = true;
-    bool placeQuestMaterialsInOwnDirectory = true;
-    enum Types {
-        SwitchToMaterial,
-        RemoveGameObject
-    }
+    bool isRunningOnExistingQuestAvatar = false;
     List<Action> actionsToPerform = new List<Action>();
     List<System.Exception> errors = new List<System.Exception>();
     Dictionary<string, Material> knownMaterials = new Dictionary<string, Material>();
+    bool shouldPerformAtEnd = false;
 
-    [MenuItem("PeanutTools/VRC Questifyer _%#T")]
+    // user settings
+    bool autoCreateQuestMaterials = false;
+    bool placeQuestMaterialsInOwnDirectory = true;
+    bool useToonShader = false;
+
+    [MenuItem("PeanutTools/VRC Questifyer")]
     public static void ShowWindow()
     {
         var window = GetWindow<VRC_Questifyer>();
@@ -60,7 +68,7 @@ public class VRC_Questifyer : EditorWindow
 
     void OnGUI()
     {
-        GUILayout.Label("Step 1: Select your avatar");
+        GUILayout.Label("Step 1: Select your avatar", EditorStyles.boldLabel);
 
         sourceVrcAvatarDescriptor = (VRCAvatarDescriptor)EditorGUILayout.ObjectField("Avatar", sourceVrcAvatarDescriptor, typeof(VRCAvatarDescriptor));
         
@@ -68,7 +76,7 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.Space();
 
-        GUILayout.Label("Step 2: Configure your actions");
+        GUILayout.Label("Step 2: Configure your actions", EditorStyles.boldLabel);
         
         EditorGUILayout.Space();
 
@@ -92,7 +100,7 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.Space();
         
-        GUILayout.Label("Step 3: Configure settings");
+        GUILayout.Label("Step 3: Configure settings", EditorStyles.boldLabel);
 
         EditorGUILayout.Space();
         
@@ -100,17 +108,21 @@ public class VRC_Questifyer : EditorWindow
         EditorGUIUtility.labelWidth = 500;
 
         autoCreateQuestMaterials = EditorGUILayout.Toggle("Create missing Quest materials", autoCreateQuestMaterials);
-        GUILayout.Label("Will use Standard Lite");
 
-        placeQuestMaterialsInOwnDirectory = EditorGUILayout.Toggle("Place created Quest materials in a directory named \"Quest\"", placeQuestMaterialsInOwnDirectory);
-        GUILayout.Label("Recommended to keep your files tidy");
+        EditorGUILayout.Space();
+
+        placeQuestMaterialsInOwnDirectory = EditorGUILayout.Toggle("Place materials inside \"Quest\" folder (recommended)", placeQuestMaterialsInOwnDirectory);
+
+        EditorGUILayout.Space();
+
+        useToonShader = EditorGUILayout.Toggle("Use toon shader", useToonShader);
 
         EditorGUIUtility.labelWidth = originalValue;
 
         EditorGUILayout.Space();
         EditorGUILayout.Space();
 
-        GUILayout.Label("Step 4: Questify!");
+        GUILayout.Label("Step 4: Questify!", EditorStyles.boldLabel);
         
         EditorGUILayout.Space();
         EditorGUILayout.Space();
@@ -131,7 +143,9 @@ public class VRC_Questifyer : EditorWindow
         GUILayout.EndHorizontal();
         EditorGUI.EndDisabledGroup();
         
-        GUILayout.Label("Note that a Quest avatar is always created if missing");
+        GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
+        labelStyle.fontStyle = FontStyle.Italic;
+        GUILayout.Label("Dry run note: a Quest avatar is always created!", labelStyle);
 
         RenderActionsToPerform();
 
@@ -140,7 +154,7 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.Space();
 
-        GUILayout.Label("Download new versions: https://github.com/imagitama");
+        GUILayout.Label("Download new versions and get support: https://discord.gg/R6Scz6ccdn");
 
         EditorGUILayout.Space();
         EditorGUILayout.Space();
@@ -161,6 +175,8 @@ public class VRC_Questifyer : EditorWindow
         foreach (System.Exception exception in errors) {
             if (exception is MaterialNotFoundException) {
                 GUILayout.Label("Could not find either a quest version for material " + (exception as MaterialNotFoundException).pathToMaterial);
+            } else if (exception is GameObjectNotFoundException) {
+                GUILayout.Label("Could not find the game object at path " + (exception as GameObjectNotFoundException).pathToGameObject);
             } else {
                 GUILayout.Label(exception.Message);
             }
@@ -204,7 +220,7 @@ public class VRC_Questifyer : EditorWindow
         EditorGUI.BeginDisabledGroup(isEnabled != true);
 
         if (GUILayout.Button("Add", GUILayout.Width(50), GUILayout.Height(25))) {
-            AddAction(selectedType, createFormFieldValue1, createFormFieldValue2);
+            AddAction(selectedType, createFormFieldValue1, createFormFieldValue2, createFormFieldValue3);
             isCreateFormVisible = false;
         }
         
@@ -228,7 +244,7 @@ public class VRC_Questifyer : EditorWindow
                     gameObjectToUse = (GameObject)EditorGUILayout.ObjectField("Search:", gameObjectToUse, typeof(GameObject));
 
                     if (gameObjectToUse != null) { 
-                        createFormFieldValue1 = Utils.GetGameObjectPath(gameObjectToUse);
+                        createFormFieldValue1 = Utils.GetRelativeGameObjectPath(gameObjectToUse, sourceVrcAvatarDescriptor.gameObject);
                     }
 
                     GUILayout.Label("Path to material file:");
@@ -243,6 +259,9 @@ public class VRC_Questifyer : EditorWindow
                         }
                     }
 
+                    createFormFieldValue3 = EditorGUILayout.IntField("Material index (default 0):", createFormFieldValue3);
+
+                    RenderPerformAtEndToggle();
                     RenderAddButton(selectedType, createFormFieldValue1 != "" && createFormFieldValue2 != "");
                     break;
 
@@ -253,9 +272,10 @@ public class VRC_Questifyer : EditorWindow
                     gameObjectToUse = (GameObject)EditorGUILayout.ObjectField("Search:", gameObjectToUse, typeof(GameObject));
 
                     if (gameObjectToUse != null) { 
-                        createFormFieldValue1 = Utils.GetGameObjectPath(gameObjectToUse);
+                        createFormFieldValue1 = Utils.GetRelativeGameObjectPath(gameObjectToUse, sourceVrcAvatarDescriptor.gameObject);
                     }
 
+                    RenderPerformAtEndToggle();
                     RenderAddButton(selectedType, createFormFieldValue1 != "");
                     break;
                 
@@ -266,7 +286,12 @@ public class VRC_Questifyer : EditorWindow
         }
     }
 
-    void AddAction(Types type, string fieldValue1, string fieldValue2) {
+    void RenderPerformAtEndToggle() {
+        shouldPerformAtEnd = EditorGUILayout.Toggle("Perform at end", shouldPerformAtEnd);
+    }
+
+    // TODO: Better way of passing arbitrary fields around
+    void AddAction(Types type, string fieldValue1, string fieldValue2, int fieldValue3) {
         Debug.Log("Adding action...");
 
         Action action;
@@ -275,7 +300,8 @@ public class VRC_Questifyer : EditorWindow
             case Types.SwitchToMaterial:
                 action = new SwitchToMaterialAction() {
                     pathToRenderer = fieldValue1,
-                    pathToMaterial = fieldValue2
+                    pathToMaterial = fieldValue2,
+                    materialIndex = fieldValue3
                 };
                 break;
 
@@ -289,6 +315,8 @@ public class VRC_Questifyer : EditorWindow
                 throw new System.Exception("Unknown type to add!");
                 break;
         }
+
+        action.performAtEnd = shouldPerformAtEnd;
 
         List<Action> newActions = actions.ToList();
         newActions.Add(action);
@@ -332,30 +360,40 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void RenderAction(Action action) {
+        RenderTypeForAction(action);
+
         GUILayout.BeginHorizontal();
 
-        RenderTypeForAction(action);
         RenderDataForAction(action);
 
         GUILayout.EndHorizontal();
     }
 
     void RenderTypeForAction(Action action) {
+        string label;
+
         if (action is SwitchToMaterialAction) {
-            GUILayout.Label("Switch Material");
+            label = "Switch Material";
         } else if (action is RemoveGameObjectAction) {
-            GUILayout.Label("Remove Object");
+            label = "Remove Object";
         } else {
             throw new System.Exception("Unknown action!");
         }
+
+        GUILayout.Label(label + (action.performAtEnd ? " (end)" : ""));
     }
 
     void RenderDataForAction(Action action) {
+        GUIStyle guiStyle = new GUIStyle() {
+            fontSize = 10
+        };
         if (action is SwitchToMaterialAction) {
-            GUILayout.Label((action as SwitchToMaterialAction).pathToRenderer);
-            GUILayout.Label((action as SwitchToMaterialAction).pathToMaterial);
+            GUILayout.Label((action as SwitchToMaterialAction).pathToRenderer, guiStyle);
+            string label = (action as SwitchToMaterialAction).pathToMaterial;
+            string materialIndexStr = (action as SwitchToMaterialAction).materialIndex.ToString();
+            GUILayout.Label(label + " (" + materialIndexStr + ")", guiStyle);
         } else if (action is RemoveGameObjectAction) {
-            GUILayout.Label((action as RemoveGameObjectAction).pathToGameObject);
+            GUILayout.Label((action as RemoveGameObjectAction).pathToGameObject, guiStyle);
         } else {
             throw new System.Exception("Unknown action!");
         }
@@ -396,16 +434,87 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void Questify() {
-        Debug.Log("Found " + actions.Count + " actions");
-
         LoadActions();
         errors = new List<System.Exception>();
+
+        Debug.Log("Found " + actions.Count + " from filesystem");
 
         actionsToPerform = actions.ToList();
 
         GameObject avatar = CreateQuestAvatar(sourceVrcAvatarDescriptor);
 
-        SwitchAllMaterialsToQuestForAvatar(avatar);
+        AddActionsToSwitchAllMaterialsToQuestForAvatar(avatar);
+
+        Debug.Log("Added " + (actionsToPerform.Count - actions.Count) + " new actions");
+        
+        Debug.Log("Performing " + actionsToPerform.Count + " actions...");
+
+        List<Action> sortedActions = SortActions(actionsToPerform);
+
+        if (isDryRun == false) {
+            foreach (Action actionToPerform in actionsToPerform) {
+                PerformAction(actionToPerform, avatar);
+            }
+        }
+    }
+
+    List<Action> SortActions(List<Action> actionsToSort) {
+        actionsToSort.Sort((actionA, actionB) => {
+            if (actionA.performAtEnd == true && actionB.performAtEnd != true) {
+                return 1;
+            }
+            if (actionA.performAtEnd != true && actionB.performAtEnd == true) {
+                return -1;
+            }
+            // both same
+            // if (actionA.performAtEnd == true && actionB.performAtEnd == true) {
+            //     return 0;
+            // }
+            return 0;
+        });
+        return actionsToSort;
+    }
+
+    void PerformAction(Action action, GameObject avatar) {
+        if (action is SwitchToMaterialAction) {
+            string pathToRenderer = (action as SwitchToMaterialAction).pathToRenderer;
+            string pathToMaterial = (action as SwitchToMaterialAction).pathToMaterial;
+            int materialIndex = (action as SwitchToMaterialAction).materialIndex;
+            SwitchGameObjectMaterialForAvatar(avatar, pathToRenderer, pathToMaterial, materialIndex);
+        } else if (action is RemoveGameObjectAction) {
+            try {
+                string pathToGameObject = (action as RemoveGameObjectAction).pathToGameObject;
+                RemoveGameObjectForAvatar(avatar, pathToGameObject);
+            } catch (GameObjectNotFoundException exception) {
+                errors.Add(exception);
+            }
+        } else {
+            throw new System.Exception("Cannot perform action - unknown action type: " + nameof(action));
+        }
+    }
+
+    void SwitchGameObjectMaterialForAvatar(GameObject avatar, string pathToRenderer, string pathToMaterial, int materialIndex = 0) {
+        Transform rendererTransform = avatar.transform.Find(pathToRenderer);
+
+        if (rendererTransform == null) {
+            throw new System.Exception("Failed to switch game object material - game object not found! Path: " + pathToRenderer);
+        }
+
+        Renderer renderer = rendererTransform.GetComponent<Renderer>();
+
+        if (renderer == null) {
+            throw new System.Exception("Failed to switch game object material - game object does not have a renderer! Path: " + pathToRenderer);
+        }
+
+        Debug.Log("Switching renderer (" + pathToRenderer + ") material to " + pathToMaterial + " (index " + materialIndex.ToString() + ")");
+
+        Material materialToSwitchTo = GetMaterialAtPath(pathToMaterial);
+
+        Material[] existingMaterials = renderer.sharedMaterials;
+
+        existingMaterials[materialIndex] = materialToSwitchTo;
+
+        renderer.sharedMaterials = existingMaterials;
     }
 
     void CreateActionsFileIfNoExist() {
@@ -446,17 +555,21 @@ public class VRC_Questifyer : EditorWindow
         File.WriteAllText(pathToJsonFile, json);
     }
 
+    // TODO: Add as methods to Action class
     ActionJson ActionToJson(Action action) {
+        ActionJson actionJson;
+
         if (action is SwitchToMaterialAction) {
-            return new ActionJson() {
+            actionJson = new ActionJson() {
                 type = "SwitchToMaterial",
                 data = new StringStringDictionary() {
                     { "pathToRenderer", (action as SwitchToMaterialAction).pathToRenderer },
-                    { "pathToMaterial", (action as SwitchToMaterialAction).pathToMaterial }
+                    { "pathToMaterial", (action as SwitchToMaterialAction).pathToMaterial },
+                    { "materialIndex", (action as SwitchToMaterialAction).materialIndex.ToString() },
                 }
             };
         } else if (action is RemoveGameObjectAction) {
-            return new ActionJson() {
+            actionJson = new ActionJson() {
                 type = "RemoveGameObject",
                 data = new StringStringDictionary() {
                     { "pathToGameObject", (action as RemoveGameObjectAction).pathToGameObject }
@@ -465,23 +578,45 @@ public class VRC_Questifyer : EditorWindow
         } else {
             throw new System.Exception("Cannot convert action to JSON: unknown type " + nameof(action));
         }
+
+        actionJson.performAtEnd = action.performAtEnd;
+
+        return actionJson;
     }
 
     Action ActionJsonToAction(ActionJson actionJson) {
+        Action action;
+
         switch (actionJson.type) {
             case "SwitchToMaterial":
-                return new SwitchToMaterialAction() {
-                    pathToRenderer = actionJson.data["pathToRenderer"],
-                    pathToMaterial = actionJson.data["pathToMaterial"],
+                string pathToRenderer;
+                actionJson.data.TryGetValue("pathToRenderer", out pathToRenderer);
+                string pathToMaterial;
+                actionJson.data.TryGetValue("pathToMaterial", out pathToMaterial);
+                string materialIndexStr;
+                actionJson.data.TryGetValue("materialIndex", out materialIndexStr);
+
+                int materialIndex = materialIndexStr != null ? Utils.StringToInt(materialIndexStr) : 0;
+
+                action = new SwitchToMaterialAction() {
+                    pathToRenderer = pathToRenderer,
+                    pathToMaterial = pathToMaterial,
+                    materialIndex = materialIndex
                 };
+                break;
             case "RemoveGameObject":
-                return new RemoveGameObjectAction() {
+                action = new RemoveGameObjectAction() {
                     pathToGameObject = actionJson.data["pathToGameObject"]
                 };
+                break;
             default:
                 throw new System.Exception("Cannot convert action JSON to action: unknown type " + actionJson.type);
                 break;
         }
+
+        action.performAtEnd = actionJson.performAtEnd;
+
+        return action;
     }
 
     GameObject CreateQuestAvatar(VRCAvatarDescriptor sourceAvatar) {
@@ -490,6 +625,8 @@ public class VRC_Questifyer : EditorWindow
         GameObject existingObject = GameObject.Find("/" + questAvatarName);
 
         if (existingObject != null) {
+            Debug.Log("Quest avatar already exists, using it...");
+            isRunningOnExistingQuestAvatar = true;
             return existingObject;
         }
 
@@ -503,7 +640,7 @@ public class VRC_Questifyer : EditorWindow
         return clone;
     }
 
-    void SwitchAllMaterialsToQuestForAvatar(GameObject avatar) {
+    void AddActionsToSwitchAllMaterialsToQuestForAvatar(GameObject avatar) {
         Debug.Log("Switching all materials to Quest...");
 
         Renderer[] allRenderers = avatar.GetComponentsInChildren<Renderer>(true);
@@ -511,7 +648,7 @@ public class VRC_Questifyer : EditorWindow
         Debug.Log("Found " + allRenderers.Length + " renderers");
 
         foreach (Renderer renderer in allRenderers) {
-            SwitchMeshToQuestMaterialsForAvatar(avatar, renderer);
+            AddActionsForSwitchingMeshToQuestMaterialsForAvatar(avatar, renderer);
         }
     }
 
@@ -538,16 +675,14 @@ public class VRC_Questifyer : EditorWindow
         return GetMaterialAtPath(pathToMaterial, true);
     }
 
-    void SwitchMeshToQuestMaterialsForAvatar(GameObject avatar, Renderer renderer) {
-        string pathToGameObject = Utils.GetGameObjectPath(renderer.gameObject);
+    void AddActionsForSwitchingMeshToQuestMaterialsForAvatar(GameObject avatar, Renderer renderer) {
+        string relativePathToRenderer = Utils.GetRelativeGameObjectPath(renderer.gameObject, avatar);
 
-        Debug.Log("Switching all materials for renderer " + pathToGameObject + "...");
+        Debug.Log("Switching all materials for renderer " + relativePathToRenderer + "...");
 
         Material[] materials = renderer.sharedMaterials;
 
         Debug.Log("Found " + materials.Length + " materials");
-
-        Material[] newMaterials = new Material[materials.Length];
 
         int idx = -1;
 
@@ -559,8 +694,7 @@ public class VRC_Questifyer : EditorWindow
 
                 if (pathToMaterial == "" || pathToMaterial.Contains("Quest")) {
                     Debug.Log("Material is empty or already Quest, skipping...");
-                    newMaterials[idx] = material;
-                    return;
+                    continue;
                 }
                 
                 Debug.Log("Switching material " + pathToMaterial + "...");
@@ -569,9 +703,7 @@ public class VRC_Questifyer : EditorWindow
 
                 Material questMaterial = LooselyGetMaterialAtPath(pathToQuestMaterial);
 
-                if (questMaterial != null) {
-                    newMaterials[idx] = questMaterial;
-                } else {
+                if (questMaterial == null) {
                     string pathToQuestMaterialParent = Utils.GetDirectoryPathRelativeToAssets(pathToMaterial);
 
                     string pathToQuestMaterialInQuestFolder = Path.Combine(pathToQuestMaterialParent, "Quest", Path.GetFileName(pathToMaterial).Replace(".mat", " Quest.mat"));
@@ -587,35 +719,30 @@ public class VRC_Questifyer : EditorWindow
                             }
                         } else {
                             throw new MaterialNotFoundException() {
-                                pathToMaterial = pathToQuestMaterialInQuestFolder
+                                pathToMaterial = pathToMaterial
                             };
                         }
                     }
 
                     pathToQuestMaterial = pathToQuestMaterialInQuestFolder;
-
-                    newMaterials[idx] = questMaterialInFolder;
                 }
 
                 actionsToPerform.Add(new SwitchToMaterialAction() {
-                    pathToRenderer = pathToGameObject,
-                    pathToMaterial = pathToQuestMaterial
+                    pathToRenderer = relativePathToRenderer,
+                    pathToMaterial = pathToQuestMaterial,
+                    materialIndex = idx,
                 });
             } catch (System.Exception exception) {
                 errors.Add(exception);
                 throw exception;
             }
         }
-
-        if (isDryRun == false) {
-            renderer.sharedMaterials = newMaterials;
-        }
     }
 
     Material CreateMissingQuestMaterialForRenderer(string originalMaterialPath, Material originalMaterial) {
         Debug.Log("Creating missing Quest material for renderer for material: " + originalMaterialPath);
 
-        string pathToMaterialTemplate = "Assets/PeanutTools/VRC_Questifyer/Materials/QuestTemplate.mat";
+        string pathToMaterialTemplate = "Assets/PeanutTools/VRC_Questifyer/Materials/QuestTemplate" + (useToonShader ? "Toon" : "Standard") + ".mat";
         Material materialTemplate = GetMaterialAtPath(pathToMaterialTemplate);
 
         string pathToParentDir = Utils.GetDirectoryPathRelativeToAssets(originalMaterialPath);
@@ -639,30 +766,20 @@ public class VRC_Questifyer : EditorWindow
         }
 
         Material createdMaterial = GetMaterialAtPath(pathToDest);
-        
-        Texture albedoTexture = originalMaterial.GetTexture("_MainTex");
 
-        createdMaterial.SetTexture("_MainTex", albedoTexture);
+        try {
+            createdMaterial.CopyPropertiesFromMaterial(originalMaterial);
+        } catch (System.Exception err) {
+            // if props don't exist then it throws errors
+            // ignore them
+        }
+
+        if (originalMaterial.GetTexture("_EmissionMap") != null) {
+            // note this does not check the checkbox in the UI
+            createdMaterial.SetInt("_EnableEmission", 1);
+        }
 
         return createdMaterial;
-    }
-
-    void SwitchMeshByPathToQuestMaterialsForAvatar(GameObject avatar, string pathToMesh) {
-        Debug.Log("Switching all materials for mesh " + pathToMesh + "...");
-
-        Transform meshTransform = avatar.transform.Find(pathToMesh);
-
-        if (meshTransform == null) {
-            throw new System.Exception("Game object not found at path " + pathToMesh);
-        }
-
-        Renderer renderer = meshTransform.GetComponent<Renderer>();
-
-        if (renderer == null) {
-            throw new System.Exception("Renderer not found at path " + pathToMesh);
-        }
-
-        SwitchMeshToQuestMaterialsForAvatar(avatar, renderer);
     }
 
     void RemoveGameObjectForAvatar(GameObject avatar, string pathToGameObject) {
@@ -671,8 +788,13 @@ public class VRC_Questifyer : EditorWindow
         Transform foundTransform = avatar.transform.Find(pathToGameObject);
 
         if (foundTransform == null) {
-            Debug.Log("Game object not found at path " + pathToGameObject);
-            return;
+            if (isRunningOnExistingQuestAvatar) {
+                return;
+            } else {
+                throw new GameObjectNotFoundException() {
+                    pathToGameObject = pathToGameObject
+                };
+            }
         }
 
         DestroyImmediate(foundTransform.gameObject);
