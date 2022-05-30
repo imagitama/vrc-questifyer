@@ -17,7 +17,10 @@ namespace VRCQuestifyer {
 
         public static string GetRelativeGameObjectPath(GameObject obj, GameObject relativeTo) {
             string absolutePath = GetGameObjectPath(obj);
-            string relativePath = absolutePath.Replace("/" + relativeTo.name + "/", "");
+            string relativePath = absolutePath.Replace("/" + relativeTo.name + "/", "/");
+            relativePath = relativePath.Replace(relativeTo.name + "/", "/");
+            relativePath = relativePath.Replace("/" + relativeTo.name, "/");
+            relativePath = relativePath.Replace(relativeTo.name, "/");
             return relativePath;
         }
 
@@ -31,6 +34,18 @@ namespace VRCQuestifyer {
 
         public static int StringToInt(string val) {
             return System.Int32.Parse(val);
+        }
+
+        public static Transform FindChild(Transform source, string pathToChild) {
+            if (pathToChild.Substring(0, 1) == "/") {
+                if (pathToChild.Length == 1) {
+                    return source;
+                }
+
+                pathToChild = pathToChild.Substring(1);
+            }
+
+            return source.Find(pathToChild);
         }
     }
 }

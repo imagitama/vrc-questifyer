@@ -23,12 +23,16 @@ using VRC.SDK3.Validation;
 using VRC.Core;
 using VRCSDK2;
 using VRCQuestifyer;
+using VRC.SDK3.Dynamics.PhysBone.Components;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 public class VRC_Questifyer : EditorWindow
 {
     enum Types {
         SwitchToMaterial,
-        RemoveGameObject
+        RemoveGameObject,
+        RemovePhysBone
     }
 
     VRCAvatarDescriptor sourceVrcAvatarDescriptor;
@@ -44,6 +48,7 @@ public class VRC_Questifyer : EditorWindow
     List<System.Exception> errors = new List<System.Exception>();
     Dictionary<string, Material> knownMaterials = new Dictionary<string, Material>();
     bool shouldPerformAtEnd = false;
+    Vector2 scrollPosition;
 
     // user settings
     bool autoCreateQuestMaterials = false;
@@ -66,8 +71,31 @@ public class VRC_Questifyer : EditorWindow
         LoadActions();
     }
 
+    void HorizontalRule() {
+       Rect rect = EditorGUILayout.GetControlRect(false, 1);
+       rect.height = 1;
+       EditorGUI.DrawRect(rect, new Color ( 0.5f,0.5f,0.5f, 1 ) );
+    }
+
     void OnGUI()
     {
+        
+        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+
+        GUIStyle italicStyle = new GUIStyle(GUI.skin.label);
+        italicStyle.fontStyle = FontStyle.Italic;
+
+        GUILayout.Label("VRC Questifyer", EditorStyles.boldLabel);
+        GUILayout.Label("Automatically make your avatar Quest compatible", italicStyle);
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        HorizontalRule();
+        
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
         GUILayout.Label("Step 1: Select your avatar", EditorStyles.boldLabel);
 
         sourceVrcAvatarDescriptor = (VRCAvatarDescriptor)EditorGUILayout.ObjectField("Avatar", sourceVrcAvatarDescriptor, typeof(VRCAvatarDescriptor));
@@ -76,31 +104,12 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.Space();
 
-        GUILayout.Label("Step 2: Configure your actions", EditorStyles.boldLabel);
-        
-        EditorGUILayout.Space();
+        HorizontalRule();
 
-        RenderActions();
-
-        EditorGUILayout.Space();
-
-        if (isCreateFormVisible) {
-            RenderCreateActionForm();
-
-            if (GUILayout.Button("Cancel", GUILayout.Width(75), GUILayout.Height(25))) {
-                isCreateFormVisible = false;
-            }
-        } else {
-            if (GUILayout.Button("Add Action", GUILayout.Width(75), GUILayout.Height(25))) {
-                isCreateFormVisible = true;
-            }
-        }
-
-        EditorGUILayout.Space();
         EditorGUILayout.Space();
         EditorGUILayout.Space();
         
-        GUILayout.Label("Step 3: Configure settings", EditorStyles.boldLabel);
+        GUILayout.Label("Step 2: Configure settings", EditorStyles.boldLabel);
 
         EditorGUILayout.Space();
         
@@ -122,34 +131,67 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.Space();
 
-        GUILayout.Label("Step 4: Questify!", EditorStyles.boldLabel);
+        HorizontalRule();
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        GUILayout.Label("Step 3: Configure manual actions", EditorStyles.boldLabel);
+        GUILayout.Label("Any additional actions you usually do by hand", italicStyle);
+        
+        EditorGUILayout.Space();
+
+        RenderActions();
+
+        EditorGUILayout.Space();
+
+        if (isCreateFormVisible) {
+            RenderCreateActionForm();
+
+            if (GUILayout.Button("Cancel", GUILayout.Width(75), GUILayout.Height(25))) {
+                isCreateFormVisible = false;
+            }
+        } else {
+            if (GUILayout.Button("Add Action", GUILayout.Width(75), GUILayout.Height(25))) {
+                isCreateFormVisible = true;
+            }
+        }
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        HorizontalRule();
+        
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        GUILayout.Label("Step 4: Questify", EditorStyles.boldLabel);
         
         EditorGUILayout.Space();
         EditorGUILayout.Space();
 
         EditorGUI.BeginDisabledGroup(sourceVrcAvatarDescriptor == null);
-        GUILayout.BeginHorizontal();
-
-        if (GUILayout.Button("Questify", GUILayout.Width(100), GUILayout.Height(50)))
-        {
-            Questify();
-        }
 
         if (GUILayout.Button("Dry Run", GUILayout.Width(100), GUILayout.Height(50)))
         {
             DryRun();
         }
-            
-        GUILayout.EndHorizontal();
-        EditorGUI.EndDisabledGroup();
-        
-        GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
-        labelStyle.fontStyle = FontStyle.Italic;
-        GUILayout.Label("Dry run note: a Quest avatar is always created!", labelStyle);
 
-        RenderActionsToPerform();
+        GUILayout.Label("Creates the avatar but doesn't perform any actions", italicStyle);
+        
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        if (GUILayout.Button("Questify!", GUILayout.Width(100), GUILayout.Height(50)))
+        {
+            Questify();
+        }
+
+        EditorGUI.EndDisabledGroup();
 
         RenderErrors();
+
+        RenderActionsToPerform();
         
         EditorGUILayout.Space();
         EditorGUILayout.Space();
@@ -163,6 +205,8 @@ public class VRC_Questifyer : EditorWindow
         GUILayout.Label("Peanut#1756");
 
         isDryRun = false;
+
+        EditorGUILayout.EndScrollView();
     }
 
     void RenderErrors() {
@@ -170,16 +214,28 @@ public class VRC_Questifyer : EditorWindow
             return;
         }
 
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
         GUILayout.Label("Errors:");
 
+        GUIStyle guiStyle = new GUIStyle() {
+            // fontSize = 10
+        };
+        guiStyle.normal.textColor = Color.red;
+
         foreach (System.Exception exception in errors) {
-            if (exception is MaterialNotFoundException) {
-                GUILayout.Label("Could not find either a quest version for material " + (exception as MaterialNotFoundException).pathToMaterial);
-            } else if (exception is GameObjectNotFoundException) {
-                GUILayout.Label("Could not find the game object at path " + (exception as GameObjectNotFoundException).pathToGameObject);
-            } else {
-                GUILayout.Label(exception.Message);
+            string message = "";
+
+            if (exception is FailedToSwitchMaterialException) {
+                message = message + "Failed to switch material: " + exception.Message + "\nMaterial: " + (exception as FailedToSwitchMaterialException).pathToMaterial;
+            } else if (exception is FailedToRemoveGameObjectException) {
+                message = message + "Failed to remove game object: " + exception.Message + "\nGame object: " + (exception as FailedToRemoveGameObjectException).pathToGameObject;
+            } else if (exception is FailedToRemovePhysBoneException) {
+                message = message + "Failed to remove PhysBone: " + exception.Message + "\nPhysBone game object: " + (exception as FailedToRemovePhysBoneException).pathToGameObject + " (index " + (exception as FailedToRemovePhysBoneException).physBoneIndex + ")";
             }
+
+            GUILayout.Label(message, guiStyle);
         }
     }
 
@@ -191,14 +247,16 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.Space();
 
-        GUILayout.Label("Actions that have been performed (or to perform if dry):");
+        HorizontalRule();
+        
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        GUILayout.Label("Final actions:");
 
         foreach (Action action in actionsToPerform) {
             RenderAction(action);
         }
-
-        EditorGUILayout.Space();
-        EditorGUILayout.Space();
     }
 
     void DryRun() {
@@ -208,11 +266,9 @@ public class VRC_Questifyer : EditorWindow
         Questify();
     }
 
-    string[] typeOptions = new string[] {
-        "Select an action",
-        Types.SwitchToMaterial.ToString(),
-        Types.RemoveGameObject.ToString()
-    };
+    void SelectFileInProjectWindow(string pathToFile) {
+        Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(pathToFile);
+    }
 
     void RenderAddButton(Types selectedType, bool isEnabled = true) {
         EditorGUILayout.Space();
@@ -228,7 +284,10 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void RenderCreateActionForm() {
-        selectedTypeDropdownIdx = EditorGUILayout.Popup("Type", selectedTypeDropdownIdx, typeOptions);
+        string[] typesAsStrings = System.Enum.GetNames(typeof(Types));
+        string[] dropdownOptions = typesAsStrings.Prepend("Select an action:").ToArray();
+
+        selectedTypeDropdownIdx = EditorGUILayout.Popup("Type", selectedTypeDropdownIdx, dropdownOptions);
 
         if (selectedTypeDropdownIdx != 0) {
             int enumIndex = selectedTypeDropdownIdx - 1;
@@ -278,6 +337,22 @@ public class VRC_Questifyer : EditorWindow
                     RenderPerformAtEndToggle();
                     RenderAddButton(selectedType, createFormFieldValue1 != "");
                     break;
+
+                case Types.RemovePhysBone:
+                    GUILayout.Label("Path to PhysBone game object:");
+                    createFormFieldValue1 = EditorGUILayout.TextField(createFormFieldValue1);
+
+                    gameObjectToUse = (GameObject)EditorGUILayout.ObjectField("Search:", gameObjectToUse, typeof(GameObject));
+
+                    if (gameObjectToUse != null) { 
+                        createFormFieldValue1 = Utils.GetRelativeGameObjectPath(gameObjectToUse, sourceVrcAvatarDescriptor.gameObject);
+                    }
+
+                    createFormFieldValue3 = EditorGUILayout.IntField("Component index (default 0):", createFormFieldValue3);
+
+                    RenderPerformAtEndToggle();
+                    RenderAddButton(selectedType, createFormFieldValue1 != "");
+                    break;
                 
                 default:
                     throw new System.Exception("Unknown type for dropdown!");
@@ -308,6 +383,13 @@ public class VRC_Questifyer : EditorWindow
             case Types.RemoveGameObject:
                 action = new RemoveGameObjectAction() {
                     pathToGameObject = fieldValue1
+                };
+                break;
+
+            case Types.RemovePhysBone:
+                action = new RemovePhysBoneAction() {
+                    pathToGameObject = fieldValue1,
+                    physBoneIndex = fieldValue3
                 };
                 break;
 
@@ -376,6 +458,8 @@ public class VRC_Questifyer : EditorWindow
             label = "Switch Material";
         } else if (action is RemoveGameObjectAction) {
             label = "Remove Object";
+        } else if (action is RemovePhysBoneAction) {
+            label = "Remove PhysBone";
         } else {
             throw new System.Exception("Unknown action!");
         }
@@ -387,13 +471,25 @@ public class VRC_Questifyer : EditorWindow
         GUIStyle guiStyle = new GUIStyle() {
             fontSize = 10
         };
+        guiStyle.normal.textColor = Color.white;
+
         if (action is SwitchToMaterialAction) {
-            GUILayout.Label((action as SwitchToMaterialAction).pathToRenderer, guiStyle);
-            string label = (action as SwitchToMaterialAction).pathToMaterial;
+            string pathToRenderer = (action as SwitchToMaterialAction).pathToRenderer;
+            GUILayout.Label(pathToRenderer, guiStyle);
+
+            string pathToMaterial = (action as SwitchToMaterialAction).pathToMaterial;
             string materialIndexStr = (action as SwitchToMaterialAction).materialIndex.ToString();
-            GUILayout.Label(label + " (" + materialIndexStr + ")", guiStyle);
+            GUILayout.Label(pathToMaterial + " (" + materialIndexStr + ")", guiStyle);
+            
+            if (GUILayout.Button("Show", GUILayout.Width(50), GUILayout.Height(15))) {
+                SelectFileInProjectWindow(pathToMaterial);
+            }
         } else if (action is RemoveGameObjectAction) {
             GUILayout.Label((action as RemoveGameObjectAction).pathToGameObject, guiStyle);
+        } else if (action is RemovePhysBoneAction) {
+            string pathToGameObject = (action as RemovePhysBoneAction).pathToGameObject;
+            string physBoneIndexStr = (action as RemovePhysBoneAction).physBoneIndex.ToString();
+            GUILayout.Label(pathToGameObject + " (" + physBoneIndexStr + ")", guiStyle);
         } else {
             throw new System.Exception("Unknown action!");
         }
@@ -435,7 +531,7 @@ public class VRC_Questifyer : EditorWindow
 
     void Questify() {
         LoadActions();
-        errors = new List<System.Exception>();
+        ClearErrors();
 
         Debug.Log("Found " + actions.Count + " from filesystem");
 
@@ -466,10 +562,6 @@ public class VRC_Questifyer : EditorWindow
             if (actionA.performAtEnd != true && actionB.performAtEnd == true) {
                 return -1;
             }
-            // both same
-            // if (actionA.performAtEnd == true && actionB.performAtEnd == true) {
-            //     return 0;
-            // }
             return 0;
         });
         return actionsToSort;
@@ -485,7 +577,15 @@ public class VRC_Questifyer : EditorWindow
             try {
                 string pathToGameObject = (action as RemoveGameObjectAction).pathToGameObject;
                 RemoveGameObjectForAvatar(avatar, pathToGameObject);
-            } catch (GameObjectNotFoundException exception) {
+            } catch (FailedToRemoveGameObjectException exception) {
+                errors.Add(exception);
+            }
+        } else if (action is RemovePhysBoneAction) {
+            try {
+                string pathToGameObject = (action as RemovePhysBoneAction).pathToGameObject;
+                int physBoneIndex = (action as RemovePhysBoneAction).physBoneIndex;
+                RemovePhysBoneForAvatar(avatar, pathToGameObject, physBoneIndex);
+            } catch (FailedToRemovePhysBoneException exception) {
                 errors.Add(exception);
             }
         } else {
@@ -493,8 +593,48 @@ public class VRC_Questifyer : EditorWindow
         }
     }
 
+    void RemovePhysBoneForAvatar(GameObject avatar, string pathToGameObject, int physBoneIndex = 0) {
+        Debug.Log("Removing physbones at " + pathToGameObject + " (" + physBoneIndex.ToString() + ")...");
+
+        if (physBoneIndex < 0) {
+            throw new FailedToRemovePhysBoneException("Index is less than 0") {
+                pathToGameObject = pathToGameObject,
+                physBoneIndex = physBoneIndex
+            };
+        } 
+
+        Transform gameObjectTransform = Utils.FindChild(avatar.transform, pathToGameObject);
+
+        if (gameObjectTransform == null) {
+            throw new FailedToRemovePhysBoneException("Game object not found") {
+                pathToGameObject = pathToGameObject,
+                physBoneIndex = physBoneIndex
+            };
+        }
+
+        VRCPhysBone[] physBones = gameObjectTransform.gameObject.GetComponents<VRCPhysBone>();
+
+        if (physBones.Length == 0) {
+            throw new FailedToRemovePhysBoneException("No PhysBones found on the game object") {
+                pathToGameObject = pathToGameObject,
+                physBoneIndex = physBoneIndex
+            };
+        }
+
+        if (physBones.Length - 1 < physBoneIndex) {
+            throw new FailedToRemovePhysBoneException("Index is too big") {
+                pathToGameObject = pathToGameObject,
+                physBoneIndex = physBoneIndex
+            };
+        }
+
+        VRCPhysBone physBoneToRemove = physBones[physBoneIndex];
+
+        DestroyImmediate(physBoneToRemove);
+    }
+
     void SwitchGameObjectMaterialForAvatar(GameObject avatar, string pathToRenderer, string pathToMaterial, int materialIndex = 0) {
-        Transform rendererTransform = avatar.transform.Find(pathToRenderer);
+        Transform rendererTransform = Utils.FindChild(avatar.transform, pathToRenderer);
 
         if (rendererTransform == null) {
             throw new System.Exception("Failed to switch game object material - game object not found! Path: " + pathToRenderer);
@@ -533,7 +673,7 @@ public class VRC_Questifyer : EditorWindow
         string pathToJsonFile = Application.dataPath + "/VRC_Questifyer_Data.json";
         string json = File.ReadAllText(pathToJsonFile);
 
-        ActionsJson actionsData = JsonUtility.FromJson<ActionsJson>(json);
+        ActionsJson actionsData = JsonConvert.DeserializeObject<ActionsJson>(json);
 
         if (actionsData.actions == null) {
             throw new System.Exception("Actions in JSON is missing!");
@@ -549,10 +689,15 @@ public class VRC_Questifyer : EditorWindow
             actions = actions.Select(action => ActionToJson(action)).ToArray()
         };
 
-        // uses Unity's serializer so make sure they have the [Serializable] attribute
-        string json = JsonUtility.ToJson(actionsForJson, true);
+        string json = JsonConvert.SerializeObject(actionsForJson, Newtonsoft.Json.Formatting.Indented);
 
         File.WriteAllText(pathToJsonFile, json);
+
+        ClearErrors();
+    }
+
+    void ClearErrors() {
+        errors = new List<System.Exception>();
     }
 
     // TODO: Add as methods to Action class
@@ -561,19 +706,27 @@ public class VRC_Questifyer : EditorWindow
 
         if (action is SwitchToMaterialAction) {
             actionJson = new ActionJson() {
-                type = "SwitchToMaterial",
-                data = new StringStringDictionary() {
-                    { "pathToRenderer", (action as SwitchToMaterialAction).pathToRenderer },
-                    { "pathToMaterial", (action as SwitchToMaterialAction).pathToMaterial },
-                    { "materialIndex", (action as SwitchToMaterialAction).materialIndex.ToString() },
-                }
+                type = Types.SwitchToMaterial.ToString(),
+                data = JObject.FromObject(new {
+                    pathToRenderer = (action as SwitchToMaterialAction).pathToRenderer,
+                    pathToMaterial = (action as SwitchToMaterialAction).pathToMaterial,
+                    materialIndex = (action as SwitchToMaterialAction).materialIndex.ToString()
+                })
             };
         } else if (action is RemoveGameObjectAction) {
             actionJson = new ActionJson() {
-                type = "RemoveGameObject",
-                data = new StringStringDictionary() {
-                    { "pathToGameObject", (action as RemoveGameObjectAction).pathToGameObject }
-                }
+                type = Types.RemoveGameObject.ToString(),
+                data = JObject.FromObject(new {
+                    pathToGameObject = (action as RemoveGameObjectAction).pathToGameObject
+                })
+            };
+        } else if (action is RemovePhysBoneAction) {
+            actionJson = new ActionJson() {
+                type = Types.RemovePhysBone.ToString(),
+                data = JObject.FromObject(new {
+                    pathToGameObject = (action as RemovePhysBoneAction).pathToGameObject,
+                    physBoneIndex = (action as RemovePhysBoneAction).physBoneIndex.ToString()
+                })
             };
         } else {
             throw new System.Exception("Cannot convert action to JSON: unknown type " + nameof(action));
@@ -587,26 +740,26 @@ public class VRC_Questifyer : EditorWindow
     Action ActionJsonToAction(ActionJson actionJson) {
         Action action;
 
-        switch (actionJson.type) {
-            case "SwitchToMaterial":
-                string pathToRenderer;
-                actionJson.data.TryGetValue("pathToRenderer", out pathToRenderer);
-                string pathToMaterial;
-                actionJson.data.TryGetValue("pathToMaterial", out pathToMaterial);
-                string materialIndexStr;
-                actionJson.data.TryGetValue("materialIndex", out materialIndexStr);
+        Types type = (Types)Types.Parse(typeof(Types), actionJson.type);
+        JObject jsonObject = actionJson.data;
 
-                int materialIndex = materialIndexStr != null ? Utils.StringToInt(materialIndexStr) : 0;
-
+        switch (type) {
+            case Types.SwitchToMaterial:
                 action = new SwitchToMaterialAction() {
-                    pathToRenderer = pathToRenderer,
-                    pathToMaterial = pathToMaterial,
-                    materialIndex = materialIndex
+                    pathToRenderer = (string)jsonObject["pathToRenderer"],
+                    pathToMaterial = (string)jsonObject["pathToMaterial"],
+                    materialIndex = (int)jsonObject["materialIndex"]
                 };
                 break;
-            case "RemoveGameObject":
+            case Types.RemoveGameObject:
                 action = new RemoveGameObjectAction() {
-                    pathToGameObject = actionJson.data["pathToGameObject"]
+                    pathToGameObject = (string)jsonObject["pathToGameObject"]
+                };
+                break;
+            case Types.RemovePhysBone:
+                action = new RemovePhysBoneAction() {
+                    pathToGameObject = (string)jsonObject["pathToGameObject"],
+                    physBoneIndex = (int)jsonObject["physBoneIndex"]
                 };
                 break;
             default:
@@ -718,7 +871,7 @@ public class VRC_Questifyer : EditorWindow
                                 questMaterialInFolder = CreateMissingQuestMaterialForRenderer(pathToMaterial, material);
                             }
                         } else {
-                            throw new MaterialNotFoundException() {
+                            throw new FailedToSwitchMaterialException("Quest material not found (auto-create disabled)") {
                                 pathToMaterial = pathToMaterial
                             };
                         }
@@ -785,13 +938,13 @@ public class VRC_Questifyer : EditorWindow
     void RemoveGameObjectForAvatar(GameObject avatar, string pathToGameObject) {
         Debug.Log("Removing game object " + pathToGameObject + "...");
 
-        Transform foundTransform = avatar.transform.Find(pathToGameObject);
+        Transform foundTransform = Utils.FindChild(avatar.transform, pathToGameObject);
 
         if (foundTransform == null) {
             if (isRunningOnExistingQuestAvatar) {
                 return;
             } else {
-                throw new GameObjectNotFoundException() {
+                throw new FailedToRemoveGameObjectException("Game object not found") {
                     pathToGameObject = pathToGameObject
                 };
             }

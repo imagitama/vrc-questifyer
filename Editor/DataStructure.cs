@@ -21,16 +21,16 @@ using VRCStation = VRC.SDK3.Avatars.Components.VRCStation;
 using VRC.SDK3.Validation;
 using VRC.Core;
 using VRCSDK2;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace VRCQuestifyer {
-    [Serializable]
     class ActionJson {
         public string type;
-        public StringStringDictionary data;
+        public JObject data;
         public bool performAtEnd;
     }
 
-    [Serializable]
     class ActionsJson {
         public ActionJson[] actions;
     }
@@ -48,7 +48,9 @@ namespace VRCQuestifyer {
     class RemoveGameObjectAction : Action {
         public string pathToGameObject;
     }
-    
-    [Serializable]
-    public class StringStringDictionary : SerializableDictionary<string, string> {}
+
+    class RemovePhysBoneAction : Action {
+        public string pathToGameObject;
+        public int physBoneIndex;
+    }
 }
