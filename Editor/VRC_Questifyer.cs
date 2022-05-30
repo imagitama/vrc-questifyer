@@ -195,18 +195,38 @@ public class VRC_Questifyer : EditorWindow
         
         EditorGUILayout.Space();
         EditorGUILayout.Space();
-
-        GUILayout.Label("Download new versions and get support: https://discord.gg/R6Scz6ccdn");
+        
+        HorizontalRule();
 
         EditorGUILayout.Space();
         EditorGUILayout.Space();
+        
+        GUILayout.Label("Links:");
 
-        GUILayout.Label("https://twitter.com/@HiPeanutBuddha");
-        GUILayout.Label("Peanut#1756");
+        RenderLink("  Download new versions from GitHub", "https://github.com/imagitama/vrc-questifyer");
+        RenderLink("  Get support from my Discord", "https://discord.gg/R6Scz6ccdn");
+        RenderLink("  Follow me on Twitter", "https://twitter.com/@HiPeanutBuddha");
 
         isDryRun = false;
 
         EditorGUILayout.EndScrollView();
+    }
+
+    void RenderLink(string label, string url) {
+        Rect rect = EditorGUILayout.GetControlRect();
+
+        if (rect.Contains(Event.current.mousePosition)) {
+            EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
+
+            if (Event.current.type == EventType.MouseUp) {
+                Help.BrowseURL(url);
+            }
+        }
+
+        GUIStyle style = new GUIStyle();
+        style.normal.textColor = new Color(0.5f, 0.5f, 1);
+
+        GUI.Label(rect, label, style);
     }
 
     void RenderErrors() {
