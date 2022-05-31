@@ -53,4 +53,8 @@ namespace VRCQuestifyer {
         public string pathToGameObject;
         public int physBoneIndex;
     }
+
+    class RemoveAllPhysBonesAction : Action {
+        public string pathToGameObject;
+    }
 }

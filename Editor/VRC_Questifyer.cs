@@ -32,7 +32,8 @@ public class VRC_Questifyer : EditorWindow
     enum Types {
         SwitchToMaterial,
         RemoveGameObject,
-        RemovePhysBone
+        RemovePhysBone,
+        RemoveAllPhysBones
     }
 
     VRCAvatarDescriptor sourceVrcAvatarDescriptor;
@@ -253,6 +254,8 @@ public class VRC_Questifyer : EditorWindow
                 message = message + "Failed to remove game object: " + exception.Message + "\nGame object: " + (exception as FailedToRemoveGameObjectException).pathToGameObject;
             } else if (exception is FailedToRemovePhysBoneException) {
                 message = message + "Failed to remove PhysBone: " + exception.Message + "\nPhysBone game object: " + (exception as FailedToRemovePhysBoneException).pathToGameObject + " (index " + (exception as FailedToRemovePhysBoneException).physBoneIndex + ")";
+            } else if (exception is FailedToRemoveAllPhysBonesException) {
+                message = message + "Failed to remove all PhysBones: " + exception.Message + "\nGame object: " + (exception as FailedToRemovePhysBoneException).pathToGameObject;
             }
 
             GUILayout.Label(message, guiStyle);
@@ -373,6 +376,20 @@ public class VRC_Questifyer : EditorWindow
                     RenderPerformAtEndToggle();
                     RenderAddButton(selectedType, createFormFieldValue1 != "");
                     break;
+
+                case Types.RemoveAllPhysBones:
+                    GUILayout.Label("Path to game object:");
+                    createFormFieldValue1 = EditorGUILayout.TextField(createFormFieldValue1);
+
+                    gameObjectToUse = (GameObject)EditorGUILayout.ObjectField("Search:", gameObjectToUse, typeof(GameObject));
+
+                    if (gameObjectToUse != null) { 
+                        createFormFieldValue1 = Utils.GetRelativeGameObjectPath(gameObjectToUse, sourceVrcAvatarDescriptor.gameObject);
+                    }
+
+                    RenderPerformAtEndToggle();
+                    RenderAddButton(selectedType, createFormFieldValue1 != "");
+                    break;
                 
                 default:
                     throw new System.Exception("Unknown type for dropdown!");
@@ -410,6 +427,12 @@ public class VRC_Questifyer : EditorWindow
                 action = new RemovePhysBoneAction() {
                     pathToGameObject = fieldValue1,
                     physBoneIndex = fieldValue3
+                };
+                break;
+
+            case Types.RemoveAllPhysBones:
+                action = new RemoveAllPhysBonesAction() {
+                    pathToGameObject = fieldValue1
                 };
                 break;
 
@@ -480,6 +503,8 @@ public class VRC_Questifyer : EditorWindow
             label = "Remove Object";
         } else if (action is RemovePhysBoneAction) {
             label = "Remove PhysBone";
+        } else if (action is RemoveAllPhysBonesAction) {
+            label = "Remove All PhysBones";
         } else {
             throw new System.Exception("Unknown action!");
         }
@@ -510,6 +535,9 @@ public class VRC_Questifyer : EditorWindow
             string pathToGameObject = (action as RemovePhysBoneAction).pathToGameObject;
             string physBoneIndexStr = (action as RemovePhysBoneAction).physBoneIndex.ToString();
             GUILayout.Label(pathToGameObject + " (" + physBoneIndexStr + ")", guiStyle);
+        } else if (action is RemoveAllPhysBonesAction) {
+            string pathToGameObject = (action as RemoveAllPhysBonesAction).pathToGameObject;
+            GUILayout.Label(pathToGameObject, guiStyle);
         } else {
             throw new System.Exception("Unknown action!");
         }
@@ -608,6 +636,13 @@ public class VRC_Questifyer : EditorWindow
             } catch (FailedToRemovePhysBoneException exception) {
                 errors.Add(exception);
             }
+        } else if (action is RemoveAllPhysBonesAction) {
+            try {
+                string pathToGameObject = (action as RemoveAllPhysBonesAction).pathToGameObject;
+                RemoveAllPhysBonesOnGameObjectForAvatar(avatar, pathToGameObject);
+            } catch (FailedToRemovePhysBoneException exception) {
+                errors.Add(exception);
+            }
         } else {
             throw new System.Exception("Cannot perform action - unknown action type: " + nameof(action));
         }
@@ -651,6 +686,30 @@ public class VRC_Questifyer : EditorWindow
         VRCPhysBone physBoneToRemove = physBones[physBoneIndex];
 
         DestroyImmediate(physBoneToRemove);
+    }
+
+    void RemoveAllPhysBonesOnGameObjectForAvatar(GameObject avatar, string pathToGameObject) {
+        Debug.Log("Removing all physbones at " + pathToGameObject + "...");
+
+        Transform gameObjectTransform = Utils.FindChild(avatar.transform, pathToGameObject);
+
+        if (gameObjectTransform == null) {
+            throw new FailedToRemoveAllPhysBonesException("Game object not found") {
+                pathToGameObject = pathToGameObject
+            };
+        }
+
+        VRCPhysBone[] physBones = gameObjectTransform.gameObject.GetComponents<VRCPhysBone>();
+
+        if (physBones.Length == 0) {
+            throw new FailedToRemoveAllPhysBonesException("No PhysBones found on the game object") {
+                pathToGameObject = pathToGameObject
+            };
+        }
+
+        foreach (VRCPhysBone physBone in physBones) {
+            DestroyImmediate(physBone);
+        }
     }
 
     void SwitchGameObjectMaterialForAvatar(GameObject avatar, string pathToRenderer, string pathToMaterial, int materialIndex = 0) {
@@ -748,6 +807,13 @@ public class VRC_Questifyer : EditorWindow
                     physBoneIndex = (action as RemovePhysBoneAction).physBoneIndex.ToString()
                 })
             };
+        } else if (action is RemoveAllPhysBonesAction) {
+            actionJson = new ActionJson() {
+                type = Types.RemoveAllPhysBones.ToString(),
+                data = JObject.FromObject(new {
+                    pathToGameObject = (action as RemoveAllPhysBonesAction).pathToGameObject
+                })
+            };
         } else {
             throw new System.Exception("Cannot convert action to JSON: unknown type " + nameof(action));
         }
@@ -780,6 +846,11 @@ public class VRC_Questifyer : EditorWindow
                 action = new RemovePhysBoneAction() {
                     pathToGameObject = (string)jsonObject["pathToGameObject"],
                     physBoneIndex = (int)jsonObject["physBoneIndex"]
+                };
+                break;
+            case Types.RemoveAllPhysBones:
+                action = new RemoveAllPhysBonesAction() {
+                    pathToGameObject = (string)jsonObject["pathToGameObject"]
                 };
                 break;
             default:

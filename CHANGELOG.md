@@ -1,3 +1,7 @@
+# 1.1.0
+
+- remove all PhysBones action
+
 # 1.0.0
 
 - remove PhysBone action

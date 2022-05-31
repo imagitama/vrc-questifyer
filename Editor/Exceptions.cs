@@ -21,4 +21,10 @@ namespace VRCQuestifyer {
         public string pathToGameObject;
         public int physBoneIndex;
     }
+
+    public class FailedToRemoveAllPhysBonesException : System.Exception {
+        public FailedToRemoveAllPhysBonesException(string message) : base(message) {
+        }
+        public string pathToGameObject;
+    }
 }
