@@ -247,11 +247,13 @@ public class VRC_Questifyer : EditorWindow
         public string pathInHierarchy;
         public Transform transform;
         public Material material;
+        public Texture texture;
         public TextureImporter textureImporter;
+        public long fileSizeB;
     }
 
     void RenderImportedAssets() {
-        GUILayout.Label("Asset path, hierarchy path, max resolution, compression level");
+        GUILayout.Label("Asset path, hierarchy path, max resolution, compression level, filesize");
 
         Renderer[] renderers = sourceVrcAvatarDescriptor.gameObject.GetComponentsInChildren<Renderer>();
         List<ImportedAsset> importedAssets = new List<ImportedAsset>();
@@ -276,24 +278,47 @@ public class VRC_Questifyer : EditorWindow
         
                         TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(pathToAsset);
 
+                        long fileSizeB = EditorTextureUtil.GetStorageMemorySize(texture);
+
                         importedAssets.Add(new ImportedAsset() {
                             propertyName = propertyName,
                             pathInAssets = pathToAsset,
                             pathInHierarchy = pathInHierarchy,
                             transform = renderer.transform,
                             material = material,
-                            textureImporter = importer
+                            texture = texture,
+                            textureImporter = importer,
+                            fileSizeB = fileSizeB
                         });
                     }
                 }
             }
         }
 
+        long totalSize = 0;
+
         foreach (ImportedAsset importedAsset in importedAssets) {
             EditorGUILayout.Space();
-
             RenderImportedAsset(importedAsset);
+
+            totalSize += importedAsset.fileSizeB;
         }
+
+        EditorGUILayout.Space();
+
+        GUILayout.Label("Total size: " + FormatBytes(totalSize));
+    }
+
+    // source: https://github.com/Unity-Technologies/UnityCsReference/blob/4d031e55aeeb51d36bd94c7f20182978d77807e4/Modules/QuickSearch/Editor/Utilities/Utils.cs#L347
+    public static string FormatBytes(long byteCount)
+    {
+        string[] suf = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
+        if (byteCount == 0)
+            return "0" + suf[0];
+        long bytes = System.Math.Abs(byteCount);
+        int place = System.Convert.ToInt32(System.Math.Floor(System.Math.Log(bytes, 1024)));
+        double num = System.Math.Round(bytes / System.Math.Pow(1024, place), 1);
+        return $"{System.Math.Sign(byteCount) * num} {suf[place]}";
     }
 
     string GetLabelForTextureName(string name) {
@@ -311,6 +336,19 @@ public class VRC_Questifyer : EditorWindow
         }
     }
 
+    int GetBitsPerPixel(TextureImporterFormat textureFormat) {
+        Debug.Log(textureFormat);
+        switch (textureFormat) {
+            case TextureImporterFormat.ETC2_RGBA8:
+                return 8;
+            case TextureImporterFormat.ETC2_RGB4:
+            case TextureImporterFormat.ETC_RGB4:
+                return 4;
+            default:
+                return 0;
+        }
+    }
+
     void RenderImportedAsset(ImportedAsset importedAsset) {
         int maxTextureSize;
         TextureImporterFormat textureFormat;
@@ -320,7 +358,7 @@ public class VRC_Questifyer : EditorWindow
 
         GUILayout.BeginHorizontal();
 
-        GUILayout.Label(GetLabelForTextureName(importedAsset.propertyName) + "\n" + importedAsset.pathInAssets + "\n" + importedAsset.pathInHierarchy);
+        GUILayout.Label(GetLabelForTextureName(importedAsset.propertyName) + " - " + importedAsset.pathInAssets + "\n" + importedAsset.pathInHierarchy);
 
         if (GUILayout.Button("Asset", GUILayout.Width(50), GUILayout.Height(25)))
         {
@@ -341,8 +379,7 @@ public class VRC_Questifyer : EditorWindow
 
         GUILayout.BeginHorizontal();
 
-        GUILayout.Label(maxTextureSize.ToString());
-        GUILayout.Label(compressionQuality.ToString());
+        GUILayout.Label(maxTextureSize.ToString() + "x" + maxTextureSize.ToString() + ", " + compressionQuality.ToString() + "%, " + FormatBytes(importedAsset.fileSizeB));
 
         GUILayout.EndHorizontal();
     }
