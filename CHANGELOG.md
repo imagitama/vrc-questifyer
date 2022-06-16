@@ -1,3 +1,7 @@
+# 1.2.0
+
+- output imported assets
+
 # 1.1.0
 
 - remove all PhysBones action

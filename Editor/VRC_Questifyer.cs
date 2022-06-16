@@ -50,6 +50,7 @@ public class VRC_Questifyer : EditorWindow
     Dictionary<string, Material> knownMaterials = new Dictionary<string, Material>();
     bool shouldPerformAtEnd = false;
     Vector2 scrollPosition;
+    bool isImportedAssetsShown = false;
 
     // user settings
     bool autoCreateQuestMaterials = false;
@@ -201,6 +202,33 @@ public class VRC_Questifyer : EditorWindow
 
         EditorGUILayout.Space();
         EditorGUILayout.Space();
+
+        if (isImportedAssetsShown) {
+            if (GUILayout.Button("Hide Imported Assets", GUILayout.Width(150), GUILayout.Height(25)))
+            {
+                isImportedAssetsShown = false;
+            }
+        } else {
+            if (GUILayout.Button("Show Imported Assets", GUILayout.Width(150), GUILayout.Height(25)))
+            {
+                isImportedAssetsShown = true;
+            }
+        }
+
+        if (isImportedAssetsShown) {
+            EditorGUILayout.Space();
+            EditorGUILayout.Space();  
+
+            RenderImportedAssets();
+        }
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();  
+
+        HorizontalRule();
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
         
         GUILayout.Label("Links:");
 
@@ -211,6 +239,112 @@ public class VRC_Questifyer : EditorWindow
         isDryRun = false;
 
         EditorGUILayout.EndScrollView();
+    }
+
+    public class ImportedAsset {
+        public string propertyName;
+        public string pathInAssets;
+        public string pathInHierarchy;
+        public Transform transform;
+        public Material material;
+        public TextureImporter textureImporter;
+    }
+
+    void RenderImportedAssets() {
+        GUILayout.Label("Asset path, hierarchy path, max resolution, compression level");
+
+        Renderer[] renderers = sourceVrcAvatarDescriptor.gameObject.GetComponentsInChildren<Renderer>();
+        List<ImportedAsset> importedAssets = new List<ImportedAsset>();
+
+        foreach (Renderer renderer in renderers) {
+            string pathInHierarchy = Utils.GetGameObjectPath(renderer.gameObject);
+
+            foreach (Material material in renderer.sharedMaterials) {
+                Shader shader = material.shader;
+
+                for(int i = 0; i < ShaderUtil.GetPropertyCount(shader); i++) {
+                    if (ShaderUtil.GetPropertyType(shader, i) == ShaderUtil.ShaderPropertyType.TexEnv) {
+                        string propertyName = ShaderUtil.GetPropertyName(shader, i);
+
+                        Texture texture = material.GetTexture(propertyName);
+
+                        if (texture == null) {
+                            continue;
+                        }
+
+                        string pathToAsset = AssetDatabase.GetAssetPath(texture);
+        
+                        TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(pathToAsset);
+
+                        importedAssets.Add(new ImportedAsset() {
+                            propertyName = propertyName,
+                            pathInAssets = pathToAsset,
+                            pathInHierarchy = pathInHierarchy,
+                            transform = renderer.transform,
+                            material = material,
+                            textureImporter = importer
+                        });
+                    }
+                }
+            }
+        }
+
+        foreach (ImportedAsset importedAsset in importedAssets) {
+            EditorGUILayout.Space();
+
+            RenderImportedAsset(importedAsset);
+        }
+    }
+
+    string GetLabelForTextureName(string name) {
+        switch (name) {
+            case "_MainTex":
+                return "Albedo";
+            case "_BumpMap":
+                return "Normal";
+            case "_EmissionMap":
+                return "Emission";
+            case "_MetallicGlossMap":
+                return "Metallic/Gloss";
+            default:
+                return name;
+        }
+    }
+
+    void RenderImportedAsset(ImportedAsset importedAsset) {
+        int maxTextureSize;
+        TextureImporterFormat textureFormat;
+        int compressionQuality;
+
+        importedAsset.textureImporter.GetPlatformTextureSettings("Android", out maxTextureSize, out textureFormat, out compressionQuality);
+
+        GUILayout.BeginHorizontal();
+
+        GUILayout.Label(GetLabelForTextureName(importedAsset.propertyName) + "\n" + importedAsset.pathInAssets + "\n" + importedAsset.pathInHierarchy);
+
+        if (GUILayout.Button("Asset", GUILayout.Width(50), GUILayout.Height(25)))
+        {
+            Selection.activeObject = AssetDatabase.LoadAssetAtPath<Object>(importedAsset.pathInAssets);
+        }
+
+        if (GUILayout.Button("Object", GUILayout.Width(50), GUILayout.Height(25)))
+        {
+            Selection.activeObject = importedAsset.transform;
+        }
+
+        if (GUILayout.Button("Mat", GUILayout.Width(50), GUILayout.Height(25)))
+        {
+            Selection.activeObject = importedAsset.material;
+        }
+        
+        GUILayout.EndHorizontal();
+
+        GUILayout.BeginHorizontal();
+
+        GUILayout.Label(maxTextureSize.ToString());
+        GUILayout.Label(compressionQuality.ToString());
+
+        GUILayout.EndHorizontal();
     }
 
     void RenderLink(string label, string url) {
