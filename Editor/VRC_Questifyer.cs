@@ -1,6 +1,7 @@
 using System.Linq;
 using System.IO;
 using System.Reflection;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -51,7 +52,11 @@ public class VRC_Questifyer : EditorWindow
     bool shouldPerformAtEnd = false;
     Vector2 scrollPosition;
     bool isImportedAssetsShown = false;
+    
+    // build
     bool isBuilderShown = false;
+    long buildFileSize;
+    List<AssetInsideBundle> thingsInsideBundle = new List<AssetInsideBundle>();
 
     // user settings
     bool autoCreateQuestMaterials = false;
@@ -226,8 +231,14 @@ public class VRC_Questifyer : EditorWindow
         }
 
         EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        HorizontalRule();
+
+        EditorGUILayout.Space();
         EditorGUILayout.Space();  
 
+        EditorGUI.BeginDisabledGroup(sourceVrcAvatarDescriptor == null);
         if (isBuilderShown) {
             if (GUILayout.Button("Hide Builder", GUILayout.Width(150), GUILayout.Height(25)))
             {
@@ -239,14 +250,18 @@ public class VRC_Questifyer : EditorWindow
                 isBuilderShown = true;
             }
         }
+        EditorGUI.EndDisabledGroup();
 
-        if (isBuilderShown) {
+        if (isBuilderShown && sourceVrcAvatarDescriptor != null) {
             EditorGUILayout.Space();
             EditorGUILayout.Space();  
 
             RenderBuilder();
         }
 
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+        
         HorizontalRule();
 
         EditorGUILayout.Space();
@@ -264,7 +279,178 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void RenderBuilder() {
+        if (GUILayout.Button("Build Avatar", GUILayout.Width(150), GUILayout.Height(25)))
+        {
+            BuildAvatar();
+        }
 
+        if (GUILayout.Button("Inspect Last Build", GUILayout.Width(150), GUILayout.Height(25)))
+        {
+            InspectLastBuild();
+        }
+
+        RenderLastBuild();
+    }
+
+    public class AssetInsideBundle {
+        public List<string> pathsInHierarchy;
+        public string pathToAsset;
+        public long fileSizeB;
+    }
+
+    void RenderLastBuild() {
+        if (buildFileSize == null) {
+            return;
+        }
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+        
+        GUILayout.Label("Total avatar size: " + FormatBytes(buildFileSize) + " (estimate)");
+        
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        GUILayout.Label("Detected meshes:");
+
+        if (thingsInsideBundle.Count == 0) {
+            EditorGUILayout.Space();
+            EditorGUILayout.Space();    
+
+            GUIStyle italicStyle = new GUIStyle(GUI.skin.label);
+            italicStyle.fontStyle = FontStyle.Italic;
+    
+            GUILayout.Label("(none)", italicStyle);
+        }
+
+        long totalSize = 0;
+
+        foreach (AssetInsideBundle assetInsideBundle in thingsInsideBundle) {
+            EditorGUILayout.Space();
+            EditorGUILayout.Space();
+
+            RenderAssetInsideBundle(assetInsideBundle);
+
+            totalSize += assetInsideBundle.fileSizeB;
+        }
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        GUILayout.Label("Total asset size: " + FormatBytes(totalSize) + " (estimate)");
+    }
+
+    void BuildAvatar() {
+        Debug.Log("Building avatar...");
+
+        string pathToDirInsideAssets = "VRC_Questifyer_Temp";
+
+        Directory.CreateDirectory(Application.dataPath + "/" + pathToDirInsideAssets);
+
+        string pathToPrefabInsideAssets = "Assets/" + pathToDirInsideAssets + "/avatar.prefab";
+
+        PrefabUtility.SaveAsPrefabAsset(sourceVrcAvatarDescriptor.gameObject, pathToPrefabInsideAssets);
+
+        AssetImporter prefabAssetImporter = AssetImporter.GetAtPath(pathToPrefabInsideAssets);
+        prefabAssetImporter.SetAssetBundleNameAndVariant("vrc_questifyer", "");
+
+        AssetBundleBuild assetBundleBuild = new AssetBundleBuild() {
+            assetNames = new string[1] { pathToPrefabInsideAssets },
+            assetBundleName = "vrc_questifyer"
+        };
+
+        string assetBundleOutputPath = Application.dataPath + "/" + pathToDirInsideAssets;
+
+        UnityEditor.BuildPipeline.BuildAssetBundles(assetBundleOutputPath, new AssetBundleBuild[1]
+        {
+            assetBundleBuild
+        }, (BuildAssetBundleOptions) 0, EditorUserBuildSettings.activeBuildTarget);
+
+        Debug.Log("Avatar has been built");
+    }
+
+    List<AssetInsideBundle> GetMeshAssetsInsideBundle(GameObject rootGameObject) {
+        List<AssetInsideBundle> things = new List<AssetInsideBundle>();
+
+        MeshFilter[] meshFilters = (MeshFilter[])rootGameObject.GetComponentsInChildren<MeshFilter>(true);
+
+        for (int i = 0; i < meshFilters.Length; i++) {
+            MeshFilter meshFilter = meshFilters[i];
+            Mesh mesh = meshFilter.sharedMesh;
+
+            string pathInHierarchy = Utils.GetGameObjectPath(meshFilter.gameObject);
+
+            string pathToAsset = AssetDatabase.GetAssetPath(mesh);
+            
+            int existingIndex = things.FindIndex(thing => thing.pathToAsset == pathToAsset);
+
+            if (existingIndex > -1) {
+                things[existingIndex].pathsInHierarchy.Add(pathInHierarchy);
+            } else {
+                things.Add(new AssetInsideBundle() {
+                    pathsInHierarchy = new List<string>() { pathInHierarchy },
+                    pathToAsset = pathToAsset,
+                    fileSizeB = GetFileSizeOfAsset(mesh)
+                });
+            }
+        }
+
+        SkinnedMeshRenderer[] skinnedMeshRenderers = (SkinnedMeshRenderer[])rootGameObject.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+
+        for (int i = 0; i < skinnedMeshRenderers.Length; i++) {
+            SkinnedMeshRenderer skinnedMeshRenderer = skinnedMeshRenderers[i];
+            Mesh mesh = skinnedMeshRenderer.sharedMesh;
+            
+            string pathInHierarchy = Utils.GetGameObjectPath(skinnedMeshRenderer.gameObject);
+
+            string pathToAsset = AssetDatabase.GetAssetPath(mesh);
+
+            int existingIndex = things.FindIndex(thing => thing.pathToAsset == pathToAsset);
+
+            if (existingIndex > -1) {
+                things[existingIndex].pathsInHierarchy.Add(pathInHierarchy);
+            } else {
+                things.Add(new AssetInsideBundle() {
+                    pathsInHierarchy = new List<string>() { pathInHierarchy },
+                    pathToAsset = pathToAsset,
+                    fileSizeB = GetFileSizeOfAsset(mesh)
+                });
+            }
+        }
+
+        return things;
+    }
+
+    void InspectLastBuild() {
+        Debug.Log("Inspecting last build...");
+
+        string pathToDirInsideAssets = "VRC_Questifyer_Temp";
+        string assetBundleName = "vrc_questifyer";
+
+        string pathToAssetBundle = Application.dataPath + "/" + pathToDirInsideAssets + "/" + assetBundleName;
+
+        buildFileSize = GetFileSize(pathToAssetBundle);
+
+        thingsInsideBundle = new List<AssetInsideBundle>();
+        thingsInsideBundle.AddRange(GetMeshAssetsInsideBundle(sourceVrcAvatarDescriptor.gameObject));
+
+        thingsInsideBundle.Sort((itemA, itemB) => (int)itemB.fileSizeB - (int)itemA.fileSizeB);
+    }
+
+    void RenderAssetInsideBundle(AssetInsideBundle assetInsideBundle) {
+        GUILayout.Label(assetInsideBundle.pathToAsset, EditorStyles.boldLabel);
+        GUILayout.Label(System.String.Join("\n", assetInsideBundle.pathsInHierarchy));
+        GUILayout.Label(FormatBytes(assetInsideBundle.fileSizeB));
+    }
+
+    long GetFileSizeOfAsset(Object thing) {
+        string absolutePath = Application.dataPath.Replace("Assets", "") + AssetDatabase.GetAssetPath(thing);
+        return GetFileSize(absolutePath);
+    }
+
+    long GetFileSize(string pathToFile) {
+        FileInfo fileInfo = new FileInfo(pathToFile);
+        return fileInfo.Length;
     }
 
     public class ImportedAsset {
@@ -326,6 +512,8 @@ public class VRC_Questifyer : EditorWindow
                 }
             }
         }
+        
+        importedAssets.Sort((itemA, itemB) => (int)itemB.fileSizeB - (int)itemA.fileSizeB);
 
         int duplicateCount = 0;
         long totalSize = 0;
@@ -342,7 +530,7 @@ public class VRC_Questifyer : EditorWindow
 
         EditorGUILayout.Space();
 
-        GUILayout.Label("Total size: " + FormatBytes(totalSize));
+        GUILayout.Label("Total size: " + FormatBytes(totalSize) + " (estimate)");
         GUILayout.Label("Duplicates not shown: " + duplicateCount.ToString());
     }
 
