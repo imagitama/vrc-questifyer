@@ -3,6 +3,7 @@
 - do not include duplicates in imported asset output and total
 - sort imported assets by filesize
 - build button
+- fix not including hidden objects
 
 # 1.2.0
 

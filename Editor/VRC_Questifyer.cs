@@ -87,7 +87,6 @@ public class VRC_Questifyer : EditorWindow
 
     void OnGUI()
     {
-        
         scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 
         GUIStyle italicStyle = new GUIStyle(GUI.skin.label);
@@ -456,13 +455,12 @@ public class VRC_Questifyer : EditorWindow
     public class ImportedAsset {
         public string propertyName;
         public string pathInAssets;
-        public string pathInHierarchy;
+        public List<string> pathsInHierarchy;
         public Transform transform;
         public Material material;
         public Texture texture;
         public TextureImporter textureImporter;
         public long fileSizeB;
-        public bool isDuplicate;
     }
 
     bool GetIsImportedAssetADuplicate(List<ImportedAsset> existingImportedAssets, string pathToAsset) {
@@ -472,7 +470,7 @@ public class VRC_Questifyer : EditorWindow
     void RenderImportedAssets() {
         GUILayout.Label("Asset path, hierarchy path, max resolution, compression level, filesize");
 
-        Renderer[] renderers = sourceVrcAvatarDescriptor.gameObject.GetComponentsInChildren<Renderer>();
+        Renderer[] renderers = sourceVrcAvatarDescriptor.gameObject.GetComponentsInChildren<Renderer>(true);
         List<ImportedAsset> importedAssets = new List<ImportedAsset>();
 
         foreach (Renderer renderer in renderers) {
@@ -496,18 +494,23 @@ public class VRC_Questifyer : EditorWindow
                         TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(pathToAsset);
 
                         long fileSizeB = EditorTextureUtil.GetStorageMemorySize(texture);
+                       
+                        int existingIndex = importedAssets.FindIndex(thing => thing.pathInAssets == pathToAsset);
 
-                        importedAssets.Add(new ImportedAsset() {
-                            propertyName = propertyName,
-                            pathInAssets = pathToAsset,
-                            pathInHierarchy = pathInHierarchy,
-                            transform = renderer.transform,
-                            material = material,
-                            texture = texture,
-                            textureImporter = importer,
-                            fileSizeB = fileSizeB,
-                            isDuplicate = GetIsImportedAssetADuplicate(importedAssets, pathToAsset)
-                        });
+                        if (existingIndex > -1) {
+                            importedAssets[existingIndex].pathsInHierarchy.Add(pathInHierarchy);
+                        } else {
+                            importedAssets.Add(new ImportedAsset() {
+                                propertyName = propertyName,
+                                pathInAssets = pathToAsset,
+                                pathsInHierarchy = new List<string>() { pathInHierarchy },
+                                transform = renderer.transform,
+                                material = material,
+                                texture = texture,
+                                textureImporter = importer,
+                                fileSizeB = fileSizeB
+                            });
+                        }
                     }
                 }
             }
@@ -515,23 +518,17 @@ public class VRC_Questifyer : EditorWindow
         
         importedAssets.Sort((itemA, itemB) => (int)itemB.fileSizeB - (int)itemA.fileSizeB);
 
-        int duplicateCount = 0;
         long totalSize = 0;
 
         foreach (ImportedAsset importedAsset in importedAssets) {
             RenderImportedAsset(importedAsset);
 
-            if (importedAsset.isDuplicate) {
-                duplicateCount++;
-            } else {
-                totalSize += importedAsset.fileSizeB;
-            }
+            totalSize += importedAsset.fileSizeB;
         }
 
         EditorGUILayout.Space();
 
         GUILayout.Label("Total size: " + FormatBytes(totalSize) + " (estimate)");
-        GUILayout.Label("Duplicates not shown: " + duplicateCount.ToString());
     }
 
     // source: https://github.com/Unity-Technologies/UnityCsReference/blob/4d031e55aeeb51d36bd94c7f20182978d77807e4/Modules/QuickSearch/Editor/Utilities/Utils.cs#L347
@@ -575,10 +572,6 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void RenderImportedAsset(ImportedAsset importedAsset) {
-        if (importedAsset.isDuplicate) {
-            return;
-        }
-
         EditorGUILayout.Space();
 
         int maxTextureSize;
@@ -587,9 +580,14 @@ public class VRC_Questifyer : EditorWindow
 
         importedAsset.textureImporter.GetPlatformTextureSettings("Android", out maxTextureSize, out textureFormat, out compressionQuality);
 
-        GUILayout.BeginHorizontal();
+        GUILayout.Label(GetLabelForTextureName(importedAsset.propertyName) + " - " + importedAsset.pathInAssets, EditorStyles.boldLabel);
+        var style = new GUIStyle() {
+            fontSize = 10
+        };
+        style.normal.textColor = Color.white;
+        GUILayout.Label(System.String.Join("\n", importedAsset.pathsInHierarchy), style);
 
-        GUILayout.Label(GetLabelForTextureName(importedAsset.propertyName) + " - " + importedAsset.pathInAssets + (importedAsset.isDuplicate ? " [DUPLICATE]" : "") + "\n" + importedAsset.pathInHierarchy);
+        GUILayout.BeginHorizontal();
 
         if (GUILayout.Button("Asset", GUILayout.Width(50), GUILayout.Height(25)))
         {
