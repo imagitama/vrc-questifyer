@@ -1,3 +1,7 @@
+# 1.3.0
+
+- do not include duplicates in imported asset output and total
+
 # 1.2.0
 
 - output imported assets
