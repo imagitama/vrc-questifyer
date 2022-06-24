@@ -369,6 +369,8 @@ public class VRC_Questifyer : EditorWindow
     }
 
     List<AssetInsideBundle> GetMeshAssetsInsideBundle(GameObject rootGameObject) {
+        // TODO: Try to create assetbundle for each mesh to get their real filesize
+
         List<AssetInsideBundle> things = new List<AssetInsideBundle>();
 
         MeshFilter[] meshFilters = (MeshFilter[])rootGameObject.GetComponentsInChildren<MeshFilter>(true);
@@ -448,8 +450,14 @@ public class VRC_Questifyer : EditorWindow
     }
 
     long GetFileSize(string pathToFile) {
-        FileInfo fileInfo = new FileInfo(pathToFile);
-        return fileInfo.Length;
+        // in some instances the path is wacko
+        try {
+            FileInfo fileInfo = new FileInfo(pathToFile);
+            return fileInfo.Length;
+        } catch (System.Exception err) {
+            Debug.Log(err);
+            return 0;
+        }
     }
 
     public class ImportedAsset {
@@ -1416,14 +1424,25 @@ public class VRC_Questifyer : EditorWindow
         } catch (System.Exception err) {
             // if props don't exist then it throws errors
             // ignore them
+            Debug.Log(err);
         }
 
-        if (originalMaterial.GetTexture("_EmissionMap") != null) {
-            // note this does not check the checkbox in the UI
-            createdMaterial.SetInt("_EnableEmission", 1);
-        }
+        RepaintInspector(typeof(Material));
 
         return createdMaterial;
+    }
+
+    public static void RepaintInspector(System.Type t)
+    {
+        Editor[] ed = (Editor[])Resources.FindObjectsOfTypeAll<Editor>();
+        for (int i = 0; i < ed.Length; i++)
+        {
+            if (ed[i].GetType() == t)
+            {
+                ed[i].Repaint();
+                return;
+            }
+        }
     }
 
     void RemoveGameObjectForAvatar(GameObject avatar, string pathToGameObject) {
