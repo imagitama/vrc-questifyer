@@ -52,6 +52,7 @@ namespace VRCQuestifyer {
 
     class RemovePhysBoneAction : Action {
         public string pathToGameObject;
+        public string pathToRootTransform;
         public int physBoneIndex;
     }
 

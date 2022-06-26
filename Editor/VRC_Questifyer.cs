@@ -3,6 +3,8 @@ using System.IO;
 using System.Reflection;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -30,6 +32,14 @@ using Newtonsoft.Json.Linq;
 
 public class VRC_Questifyer : EditorWindow
 {
+    SuccessStates successState;
+
+    enum SuccessStates {
+        Unknown,
+        Success,
+        Failed
+    }
+
     enum Types {
         SwitchToMaterial,
         RemoveGameObject,
@@ -52,6 +62,10 @@ public class VRC_Questifyer : EditorWindow
     bool shouldPerformAtEnd = false;
     Vector2 scrollPosition;
     bool isImportedAssetsShown = false;
+
+    // physbones
+    bool isPhysBonesVisible = false;
+    bool[] isToKeepEachPhysBone = new bool[0];
     
     // build
     bool isBuilderShown = false;
@@ -168,6 +182,54 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
 
         HorizontalRule();
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        GUILayout.Label("Step 4: Remove PhysBones", EditorStyles.boldLabel);
+        GUILayout.Label("Delete PhysBones to reach the limit (8)", italicStyle);
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+        
+        VRCPhysBone[] physBones = sourceVrcAvatarDescriptor != null ? GetPhysBonesInTransform(sourceVrcAvatarDescriptor.transform) : new VRCPhysBone[0];
+
+        int remainingPhysBonesCount = isToKeepEachPhysBone.ToList().Where(x => x == true).ToArray().Length;
+
+        if (physBones.Length > 0) {
+            if (remainingPhysBonesCount > 8) {
+                RenderErrorMessage("Number of PhysBones (" + remainingPhysBonesCount + ") is greater than the limit (8)");
+            } else {
+                RenderSuccessMessage("Number of PhysBones (" + remainingPhysBonesCount + ") is within the limit (8)");
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.Space();
+        }
+
+        EditorGUI.BeginDisabledGroup(sourceVrcAvatarDescriptor == null);
+        if (isPhysBonesVisible) {
+            if (GUILayout.Button("Hide PhysBones", GUILayout.Width(150), GUILayout.Height(25)))
+            {
+                isPhysBonesVisible = false;
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.Space();
+
+            RenderPhysBonesEditor(physBones);
+        } else {
+            if (GUILayout.Button("Show PhysBones", GUILayout.Width(150), GUILayout.Height(25)))
+            {
+                isPhysBonesVisible = true;
+            }
+        }
+        EditorGUI.EndDisabledGroup();
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+        
+        HorizontalRule();
         
         EditorGUILayout.Space();
         EditorGUILayout.Space();
@@ -184,7 +246,7 @@ public class VRC_Questifyer : EditorWindow
             DryRun();
         }
 
-        GUILayout.Label("Creates the avatar but doesn't perform any actions", italicStyle);
+        GUILayout.Label("Preview the actions the tool will perform", italicStyle);
         
         EditorGUILayout.Space();
         EditorGUILayout.Space();
@@ -195,6 +257,12 @@ public class VRC_Questifyer : EditorWindow
         }
 
         EditorGUI.EndDisabledGroup();
+
+        if (successState == SuccessStates.Success) {
+            EditorGUILayout.Space();
+            EditorGUILayout.Space();
+            RenderSuccessMessage("Avatar has been questified successfully");
+        }
 
         RenderErrors();
 
@@ -275,6 +343,78 @@ public class VRC_Questifyer : EditorWindow
         isDryRun = false;
 
         EditorGUILayout.EndScrollView();
+    }
+
+    VRCPhysBone[] GetPhysBonesInTransform(Transform root) {
+        return root.gameObject.GetComponentsInChildren<VRCPhysBone>(true);
+    }
+
+    void RenderPhysBonesEditor(VRCPhysBone[] physBones) {
+        if (sourceVrcAvatarDescriptor == null) {
+            return;
+        }
+
+
+        if (isToKeepEachPhysBone.Length != physBones.Length) {
+            isToKeepEachPhysBone = new bool[physBones.Length];
+
+            for (int i = 0; i < physBones.Length; i++) {
+                isToKeepEachPhysBone[i] = true;
+            }
+        }
+
+        int idx = 0;
+        Dictionary<Transform, int> componentIdxPerTransform = new Dictionary<Transform, int>();
+
+        foreach (VRCPhysBone physBone in physBones) {
+            int componentIndex;
+
+            if (componentIdxPerTransform.ContainsKey(physBone.transform)) {
+                componentIdxPerTransform[physBone.transform]++;
+                componentIndex = componentIdxPerTransform[physBone.transform];
+            } else {
+                componentIdxPerTransform[physBone.transform] = 0;
+                componentIndex = 0;
+            }
+
+            Transform physBoneRoot = physBone.rootTransform ? physBone.rootTransform : physBone.transform;
+            string pathToTransform = Utils.GetGameObjectPath(physBone.transform.gameObject);
+            string pathToPhysBoneRoot = Utils.GetGameObjectPath(physBoneRoot.gameObject);
+
+            GUIStyle guiStyle = new GUIStyle(GUI.skin.label) {
+                fontSize = 10
+            };
+
+            if (isToKeepEachPhysBone[idx] == false) {
+                guiStyle = new GUIStyle(GUI.skin.label) {
+                    fontSize = 10
+                };
+                guiStyle.normal.textColor = new Color(1.0f, 1.0f, 1.0f, 0.5f);
+            }
+
+            GUILayout.Label(pathToTransform.Substring(1) + " (" + componentIndex + ")", guiStyle);
+
+            if (pathToTransform != pathToPhysBoneRoot) {
+                GUILayout.Label(" => " + pathToPhysBoneRoot.Substring(1), guiStyle);
+            }
+
+            EditorGUILayout.BeginHorizontal();
+
+            isToKeepEachPhysBone[idx] = !EditorGUILayout.Toggle("Delete", !isToKeepEachPhysBone[idx]);
+
+            if (RenderTinyButton("Bone")) {
+                SelectPhysBoneComponent(physBone);
+            }
+
+            if (RenderTinyButton("Root")) {
+                SelectTransform(physBoneRoot);
+            }
+            
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space();
+            
+            idx++;
+        }
     }
 
     void RenderBuilder() {
@@ -589,7 +729,7 @@ public class VRC_Questifyer : EditorWindow
         importedAsset.textureImporter.GetPlatformTextureSettings("Android", out maxTextureSize, out textureFormat, out compressionQuality);
 
         GUILayout.Label(GetLabelForTextureName(importedAsset.propertyName) + " - " + importedAsset.pathInAssets, EditorStyles.boldLabel);
-        var style = new GUIStyle() {
+        var style = new GUIStyle(GUI.skin.label) {
             fontSize = 10
         };
         style.normal.textColor = Color.white;
@@ -648,11 +788,6 @@ public class VRC_Questifyer : EditorWindow
 
         GUILayout.Label("Errors:");
 
-        GUIStyle guiStyle = new GUIStyle() {
-            // fontSize = 10
-        };
-        guiStyle.normal.textColor = Color.red;
-
         foreach (System.Exception exception in errors) {
             string message = "";
 
@@ -666,8 +801,22 @@ public class VRC_Questifyer : EditorWindow
                 message = message + "Failed to remove all PhysBones: " + exception.Message + "\nGame object: " + (exception as FailedToRemovePhysBoneException).pathToGameObject;
             }
 
-            GUILayout.Label(message, guiStyle);
+            RenderErrorMessage(message);
         }
+    }
+
+    void RenderErrorMessage(string message) {
+        GUIStyle guiStyle = new GUIStyle();
+        guiStyle.normal.textColor = new Color(1.0f, 0.5f, 0.5f);
+
+        GUILayout.Label(message, guiStyle);
+    }
+
+    void RenderSuccessMessage(string message) {
+        GUIStyle guiStyle = new GUIStyle();
+        guiStyle.normal.textColor = new Color(0.5f, 1.0f, 0.5f);
+
+        GUILayout.Label(message, guiStyle);
     }
 
     void RenderActionsToPerform() {
@@ -687,6 +836,7 @@ public class VRC_Questifyer : EditorWindow
 
         foreach (Action action in actionsToPerform) {
             RenderAction(action);
+            EditorGUILayout.Space();
         }
 
         Material[] materials = GetMaterialsInActionsToPerform();
@@ -718,8 +868,34 @@ public class VRC_Questifyer : EditorWindow
         Questify();
     }
 
-    void SelectGameObjectByPath(string pathInsideAvatar) {
-        Selection.activeObject = Utils.FindChild(sourceVrcAvatarDescriptor.transform, pathInsideAvatar);
+    void SelectPhysBoneComponent(VRCPhysBone physBoneToSelect) {
+        Selection.activeObject = physBoneToSelect.gameObject;
+
+        Component[] allComponents = physBoneToSelect.transform.GetComponents<Component>();
+
+        foreach (Component component in allComponents)
+        {
+            InternalEditorUtility.SetIsInspectorExpanded(component, false);
+        }
+        
+        // note this expands ALL physbones (don't know how to get around this)
+        InternalEditorUtility.SetIsInspectorExpanded(physBoneToSelect, true);
+
+        ActiveEditorTracker.sharedTracker.ForceRebuild();
+    }
+
+    void SelectTransform(Transform thing) {
+        Selection.activeObject = thing.gameObject;
+    }
+
+    void SelectGameObjectByPathInsideAvatar(string pathInsideAvatar) {
+        Transform result = Utils.FindChild(sourceVrcAvatarDescriptor.transform, pathInsideAvatar);
+
+        if (result == null) {
+            throw new System.Exception("Could not select game object by path " + pathInsideAvatar);
+        }
+
+        Selection.activeObject = result;
     }
 
     void SelectFileInProjectWindow(string pathToFile) {
@@ -919,7 +1095,6 @@ public class VRC_Questifyer : EditorWindow
 
     void RenderAction(Action action) {
         RenderTypeForAction(action);
-
         RenderDataForAction(action);
         RenderControlsForAction(action);
     }
@@ -942,33 +1117,34 @@ public class VRC_Questifyer : EditorWindow
         GUILayout.Label(label + (action.performAtEnd ? " (end)" : ""));
     }
 
+    string GetOutputForPath(string path) {
+        return path != "" ? path : "(root)";
+    }
+
     void RenderDataForAction(Action action) {
         GUILayout.BeginHorizontal();
 
-        GUIStyle guiStyle = new GUIStyle() {
+        GUIStyle guiStyle = new GUIStyle(GUI.skin.label) {
             fontSize = 10
         };
-        guiStyle.normal.textColor = Color.white;
 
         if (action is SwitchToMaterialAction) {
             string pathToRenderer = (action as SwitchToMaterialAction).pathToRenderer;
             string pathToMaterial = (action as SwitchToMaterialAction).pathToMaterial;
             string materialIndexStr = (action as SwitchToMaterialAction).materialIndex.ToString();
             bool autoCreated = (action as SwitchToMaterialAction).autoCreated;
-            GUILayout.Label(pathToRenderer.Substring(1) + " => " + pathToMaterial + " (" + materialIndexStr + ")" + (autoCreated ? " (created)" : ""), guiStyle);
-            
-            if (GUILayout.Button("Show", GUILayout.Width(50), GUILayout.Height(15))) {
-                SelectFileInProjectWindow(pathToMaterial);
-            }
+            GUILayout.Label(GetOutputForPath(pathToRenderer) + " => " + pathToMaterial + " (" + materialIndexStr + ")" + (autoCreated ? " (created)" : ""), guiStyle);
         } else if (action is RemoveGameObjectAction) {
-            GUILayout.Label((action as RemoveGameObjectAction).pathToGameObject, guiStyle);
+            string pathToGameObject = (action as RemoveGameObjectAction).pathToGameObject;
+            GUILayout.Label(GetOutputForPath(pathToGameObject), guiStyle);
         } else if (action is RemovePhysBoneAction) {
             string pathToGameObject = (action as RemovePhysBoneAction).pathToGameObject;
+            string pathToRootTransform = (action as RemovePhysBoneAction).pathToRootTransform;
             string physBoneIndexStr = (action as RemovePhysBoneAction).physBoneIndex.ToString();
-            GUILayout.Label(pathToGameObject + " (" + physBoneIndexStr + ")", guiStyle);
+            GUILayout.Label(GetOutputForPath(pathToGameObject) + (pathToRootTransform != null && pathToRootTransform != pathToGameObject ? " : " + GetOutputForPath(pathToRootTransform) : "") + " (" + physBoneIndexStr + ")", guiStyle);
         } else if (action is RemoveAllPhysBonesAction) {
             string pathToGameObject = (action as RemoveAllPhysBonesAction).pathToGameObject;
-            GUILayout.Label(pathToGameObject, guiStyle);
+            GUILayout.Label(GetOutputForPath(pathToGameObject), guiStyle);
         } else {
             throw new System.Exception("Unknown action!");
         }
@@ -988,7 +1164,7 @@ public class VRC_Questifyer : EditorWindow
             string pathToMaterial = (action as SwitchToMaterialAction).pathToMaterial;
 
             if (RenderTinyButton("Obj")) {
-                SelectGameObjectByPath(pathToRenderer);
+                SelectGameObjectByPathInsideAvatar(pathToRenderer);
             }
 
             if (RenderTinyButton("Mat")) {
@@ -998,19 +1174,19 @@ public class VRC_Questifyer : EditorWindow
             string pathToGameObject = (action as RemoveGameObjectAction).pathToGameObject;
 
             if (RenderTinyButton("Obj")) {
-                SelectGameObjectByPath(pathToGameObject);
+                SelectGameObjectByPathInsideAvatar(pathToGameObject);
             }
         } else if (action is RemovePhysBoneAction) {
             string pathToGameObject = (action as RemovePhysBoneAction).pathToGameObject;
 
             if (RenderTinyButton("Obj")) {
-                SelectGameObjectByPath(pathToGameObject);
+                SelectGameObjectByPathInsideAvatar(pathToGameObject);
             }
         } else if (action is RemoveAllPhysBonesAction) {
             string pathToGameObject = (action as RemoveAllPhysBonesAction).pathToGameObject;
             
             if (RenderTinyButton("Obj")) {
-                SelectGameObjectByPath(pathToGameObject);
+                SelectGameObjectByPathInsideAvatar(pathToGameObject);
             }
         } else {
             throw new System.Exception("Unknown action!");
@@ -1054,6 +1230,8 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void Questify() {
+        successState = SuccessStates.Unknown;
+
         LoadActions();
         ClearErrors();
 
@@ -1064,9 +1242,10 @@ public class VRC_Questifyer : EditorWindow
         GameObject avatar = CreateQuestAvatar(sourceVrcAvatarDescriptor);
 
         AddActionsToSwitchAllMaterialsToQuestForAvatar(avatar);
+        AddActionsToRemovePhysBonesForAvatar(avatar);
 
         Debug.Log("Added " + (actionsToPerform.Count - actions.Count) + " new actions");
-        
+
         Debug.Log("Performing " + actionsToPerform.Count + " actions...");
 
         List<Action> sortedActions = SortActions(actionsToPerform);
@@ -1075,6 +1254,14 @@ public class VRC_Questifyer : EditorWindow
             foreach (Action actionToPerform in actionsToPerform) {
                 PerformAction(actionToPerform, avatar);
             }
+        }
+
+        successState = SuccessStates.Success;
+
+        HideSuccessMessageAfterDelay();
+
+        if (isDryRun) {
+            DestroyImmediate(avatar);
         }
     }
 
@@ -1125,7 +1312,7 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void RemovePhysBoneForAvatar(GameObject avatar, string pathToGameObject, int physBoneIndex = 0) {
-        Debug.Log("Removing physbones at " + pathToGameObject + " (" + physBoneIndex.ToString() + ")...");
+        Debug.Log("Removing PhysBones at " + pathToGameObject + " (" + physBoneIndex.ToString() + ")...");
 
         if (physBoneIndex < 0) {
             throw new FailedToRemovePhysBoneException("Index is less than 0") {
@@ -1134,7 +1321,7 @@ public class VRC_Questifyer : EditorWindow
             };
         } 
 
-        Transform gameObjectTransform = Utils.FindChild(avatar.transform, pathToGameObject);
+        Transform gameObjectTransform = pathToGameObject == "" ? avatar.transform : Utils.FindChild(avatar.transform, pathToGameObject);
 
         if (gameObjectTransform == null) {
             throw new FailedToRemovePhysBoneException("Game object not found") {
@@ -1165,7 +1352,7 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void RemoveAllPhysBonesOnGameObjectForAvatar(GameObject avatar, string pathToGameObject) {
-        Debug.Log("Removing all physbones at " + pathToGameObject + "...");
+        Debug.Log("Removing all physBones at " + pathToGameObject + "...");
 
         Transform gameObjectTransform = Utils.FindChild(avatar.transform, pathToGameObject);
 
@@ -1361,7 +1548,7 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void AddActionsToSwitchAllMaterialsToQuestForAvatar(GameObject avatar) {
-        Debug.Log("Switching all materials to Quest...");
+        Debug.Log("Adding actions to switch all materials to Quest...");
 
         Renderer[] allRenderers = avatar.GetComponentsInChildren<Renderer>(true);
 
@@ -1370,6 +1557,45 @@ public class VRC_Questifyer : EditorWindow
         foreach (Renderer renderer in allRenderers) {
             AddActionsForSwitchingMeshToQuestMaterialsForAvatar(avatar, renderer);
         }
+    }
+
+    void AddActionsToRemovePhysBonesForAvatar(GameObject avatar) {
+        Debug.Log("Adding actions to remove PhysBones...");
+
+        VRCPhysBone[] physBones = GetPhysBonesInTransform(avatar.transform);
+
+        if (physBones.Length != isToKeepEachPhysBone.Length) {
+            throw new System.Exception("The number of PhysBones has changed (was " + isToKeepEachPhysBone.Length + " now " + physBones.Length + ")");
+        }
+
+        Dictionary<Transform, int> componentIdxPerTransform = new Dictionary<Transform, int>();
+
+        for (int i = 0; i < physBones.Length; i++) {
+            VRCPhysBone physBone = physBones[i];
+            bool deleteThisPhysBone = isToKeepEachPhysBone[i] == false;
+
+            int componentIndex;
+
+            if (componentIdxPerTransform.ContainsKey(physBone.transform)) {
+                componentIdxPerTransform[physBone.transform]++;
+                componentIndex = componentIdxPerTransform[physBone.transform];
+            } else {
+                componentIdxPerTransform[physBone.transform] = 0;
+                componentIndex = 0;
+            }
+
+            if (deleteThisPhysBone) {
+                AddActionToDeletePhysBone(physBone, componentIndex, avatar);
+            }
+        }
+    }
+
+    void AddActionToDeletePhysBone(VRCPhysBone physBone, int componentIndex, GameObject avatar) {
+        actionsToPerform.Add(new RemovePhysBoneAction() {
+            pathToGameObject = Utils.GetRelativeGameObjectPath(physBone.gameObject, avatar),
+            pathToRootTransform = Utils.GetRelativeGameObjectPath(physBone.rootTransform ? physBone.rootTransform.gameObject : physBone.transform.gameObject, avatar),
+            physBoneIndex = componentIndex
+        });
     }
 
     Material GetMaterialAtPath(string pathToMaterial, bool ignoreNotFound = false) {
@@ -1412,8 +1638,12 @@ public class VRC_Questifyer : EditorWindow
             try {
                 string pathToMaterial = AssetDatabase.GetAssetPath(material);
 
-                if (pathToMaterial == "" || pathToMaterial.Contains("Quest")) {
-                    Debug.Log("Material is empty or already Quest, skipping...");
+                if (pathToMaterial == "") {
+                    throw new System.Exception("Failed to find material at path " + pathToMaterial);
+                }
+
+                if (pathToMaterial.Contains("Quest")) {
+                    Debug.Log("Material is already named with Quest, skipping...");
                     continue;
                 }
                 
@@ -1533,5 +1763,15 @@ public class VRC_Questifyer : EditorWindow
         }
 
         DestroyImmediate(foundTransform.gameObject);
+    }
+
+    async Task HideSuccessMessageAfterDelay()
+    {   
+        await Task.Run(() => ResetSuccessState());
+    }
+    
+    void ResetSuccessState() {
+        Thread.Sleep(2000);
+        successState = SuccessStates.Unknown;
     }
 }

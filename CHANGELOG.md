@@ -1,6 +1,9 @@
 # 1.4.0
 
 - select all materials button
+- toggle PhysBones
+- dry run cleans up created avatar
+- show success message
 
 # 1.3.0
 

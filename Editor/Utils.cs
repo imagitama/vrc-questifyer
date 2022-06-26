@@ -15,13 +15,9 @@ namespace VRCQuestifyer {
             return path;
         }
 
-        public static string GetRelativeGameObjectPath(GameObject obj, GameObject relativeTo) {
-            string absolutePath = GetGameObjectPath(obj);
-            string relativePath = absolutePath.Replace("/" + relativeTo.name + "/", "/");
-            relativePath = relativePath.Replace(relativeTo.name + "/", "/");
-            relativePath = relativePath.Replace("/" + relativeTo.name, "/");
-            relativePath = relativePath.Replace(relativeTo.name, "/");
-            return relativePath;
+        // does NOT start with slash
+        public static string GetRelativeGameObjectPath(GameObject objToFind, GameObject rootObj) {
+            return GetGameObjectPath(objToFind).Replace(GetGameObjectPath(rootObj), "");
         }
 
         public static string GetPathRelativeToAssets(string path) {
@@ -37,6 +33,10 @@ namespace VRCQuestifyer {
         }
 
         public static Transform FindChild(Transform source, string pathToChild) {
+            if (pathToChild.Length == 0) {
+                return null;
+            }
+
             if (pathToChild.Substring(0, 1) == "/") {
                 if (pathToChild.Length == 1) {
                     return source;
