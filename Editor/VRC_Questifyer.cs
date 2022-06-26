@@ -143,7 +143,7 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.Space();
 
-        GUILayout.Label("Step 3: Configure manual actions", EditorStyles.boldLabel);
+        GUILayout.Label("Step 3: Configure manual actions (optional)", EditorStyles.boldLabel);
         GUILayout.Label("Any additional actions you usually do by hand", italicStyle);
         
         EditorGUILayout.Space();
@@ -688,6 +688,27 @@ public class VRC_Questifyer : EditorWindow
         foreach (Action action in actionsToPerform) {
             RenderAction(action);
         }
+
+        Material[] materials = GetMaterialsInActionsToPerform();
+
+        EditorGUI.BeginDisabledGroup(materials.Length == 0);
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        if (GUILayout.Button("Select All Materials", GUILayout.Width(150), GUILayout.Height(25))) {
+            SelectMaterials(materials);
+        }
+
+        EditorGUI.EndDisabledGroup();
+    }
+
+    Material[] GetMaterialsInActionsToPerform() {
+        return actionsToPerform.Where(action => action is SwitchToMaterialAction && (action as SwitchToMaterialAction).pathToMaterial != "").Select(action => (Material)AssetDatabase.LoadMainAssetAtPath((action as SwitchToMaterialAction).pathToMaterial)).ToArray();
+    }
+
+    void SelectMaterials(Material[] materials) {
+        Selection.objects = materials;
     }
 
     void DryRun() {
@@ -695,6 +716,10 @@ public class VRC_Questifyer : EditorWindow
         isDryRun = true;
 
         Questify();
+    }
+
+    void SelectGameObjectByPath(string pathInsideAvatar) {
+        Selection.activeObject = Utils.FindChild(sourceVrcAvatarDescriptor.transform, pathInsideAvatar);
     }
 
     void SelectFileInProjectWindow(string pathToFile) {
@@ -895,11 +920,8 @@ public class VRC_Questifyer : EditorWindow
     void RenderAction(Action action) {
         RenderTypeForAction(action);
 
-        GUILayout.BeginHorizontal();
-
         RenderDataForAction(action);
-
-        GUILayout.EndHorizontal();
+        RenderControlsForAction(action);
     }
 
     void RenderTypeForAction(Action action) {
@@ -921,6 +943,8 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void RenderDataForAction(Action action) {
+        GUILayout.BeginHorizontal();
+
         GUIStyle guiStyle = new GUIStyle() {
             fontSize = 10
         };
@@ -928,11 +952,10 @@ public class VRC_Questifyer : EditorWindow
 
         if (action is SwitchToMaterialAction) {
             string pathToRenderer = (action as SwitchToMaterialAction).pathToRenderer;
-            GUILayout.Label(pathToRenderer, guiStyle);
-
             string pathToMaterial = (action as SwitchToMaterialAction).pathToMaterial;
             string materialIndexStr = (action as SwitchToMaterialAction).materialIndex.ToString();
-            GUILayout.Label(pathToMaterial + " (" + materialIndexStr + ")", guiStyle);
+            bool autoCreated = (action as SwitchToMaterialAction).autoCreated;
+            GUILayout.Label(pathToRenderer.Substring(1) + " => " + pathToMaterial + " (" + materialIndexStr + ")" + (autoCreated ? " (created)" : ""), guiStyle);
             
             if (GUILayout.Button("Show", GUILayout.Width(50), GUILayout.Height(15))) {
                 SelectFileInProjectWindow(pathToMaterial);
@@ -949,6 +972,51 @@ public class VRC_Questifyer : EditorWindow
         } else {
             throw new System.Exception("Unknown action!");
         }
+        
+        GUILayout.EndHorizontal();
+    }
+
+    bool RenderTinyButton(string label) {
+        return GUILayout.Button(label, GUILayout.Width(50), GUILayout.Height(15));
+    }
+
+    void RenderControlsForAction(Action action) {
+        GUILayout.BeginHorizontal();
+
+        if (action is SwitchToMaterialAction) {
+            string pathToRenderer = (action as SwitchToMaterialAction).pathToRenderer;
+            string pathToMaterial = (action as SwitchToMaterialAction).pathToMaterial;
+
+            if (RenderTinyButton("Obj")) {
+                SelectGameObjectByPath(pathToRenderer);
+            }
+
+            if (RenderTinyButton("Mat")) {
+                SelectFileInProjectWindow(pathToMaterial);
+            }
+        } else if (action is RemoveGameObjectAction) {
+            string pathToGameObject = (action as RemoveGameObjectAction).pathToGameObject;
+
+            if (RenderTinyButton("Obj")) {
+                SelectGameObjectByPath(pathToGameObject);
+            }
+        } else if (action is RemovePhysBoneAction) {
+            string pathToGameObject = (action as RemovePhysBoneAction).pathToGameObject;
+
+            if (RenderTinyButton("Obj")) {
+                SelectGameObjectByPath(pathToGameObject);
+            }
+        } else if (action is RemoveAllPhysBonesAction) {
+            string pathToGameObject = (action as RemoveAllPhysBonesAction).pathToGameObject;
+            
+            if (RenderTinyButton("Obj")) {
+                SelectGameObjectByPath(pathToGameObject);
+            }
+        } else {
+            throw new System.Exception("Unknown action!");
+        }
+        
+        GUILayout.EndHorizontal();
     }
 
     void DeleteAction(Action action) {
@@ -1355,6 +1423,8 @@ public class VRC_Questifyer : EditorWindow
 
                 Material questMaterial = LooselyGetMaterialAtPath(pathToQuestMaterial);
 
+                bool autoCreated = false;
+
                 if (questMaterial == null) {
                     string pathToQuestMaterialParent = Utils.GetDirectoryPathRelativeToAssets(pathToMaterial);
 
@@ -1368,6 +1438,7 @@ public class VRC_Questifyer : EditorWindow
                         if (autoCreateQuestMaterials) {
                             if (isDryRun == false) {
                                 questMaterialInFolder = CreateMissingQuestMaterialForRenderer(pathToMaterial, material);
+                                autoCreated = true;
                             }
                         } else {
                             throw new FailedToSwitchMaterialException("Quest material not found (auto-create disabled)") {
@@ -1383,6 +1454,7 @@ public class VRC_Questifyer : EditorWindow
                     pathToRenderer = relativePathToRenderer,
                     pathToMaterial = pathToQuestMaterial,
                     materialIndex = idx,
+                    autoCreated = autoCreated
                 });
             } catch (System.Exception exception) {
                 errors.Add(exception);

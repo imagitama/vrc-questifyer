@@ -43,6 +43,7 @@ namespace VRCQuestifyer {
         public string pathToRenderer;
         public string pathToMaterial;
         public int materialIndex;
+        public bool autoCreated;
     }
 
     class RemoveGameObjectAction : Action {

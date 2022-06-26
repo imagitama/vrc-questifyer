@@ -1,3 +1,7 @@
+# 1.4.0
+
+- select all materials button
+
 # 1.3.0
 
 - fixed materials not being packaged
