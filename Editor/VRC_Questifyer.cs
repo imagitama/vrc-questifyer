@@ -32,6 +32,8 @@ using Newtonsoft.Json.Linq;
 
 public class VRC_Questifyer : EditorWindow
 {
+    static GitHub_Update_Checker githubUpdateChecker;
+
     SuccessStates successState;
 
     enum SuccessStates {
@@ -83,6 +85,12 @@ public class VRC_Questifyer : EditorWindow
         var window = GetWindow<VRC_Questifyer>();
         window.titleContent = new GUIContent("VRC Questifyer");
         window.minSize = new Vector2(250, 50);
+
+        githubUpdateChecker = new GitHub_Update_Checker() {
+            githubOwner = "imagitama",
+            githubRepo = "vrc-questifyer",
+            currentVersion = File.ReadAllText("Assets/PeanutTools/VRC_Questifyer/VERSION.txt", System.Text.Encoding.UTF8)
+        };
     }
 
     void Awake() {
@@ -339,6 +347,16 @@ public class VRC_Questifyer : EditorWindow
         RenderLink("  Download new versions from GitHub", "https://github.com/imagitama/vrc-questifyer");
         RenderLink("  Get support from my Discord", "https://discord.gg/R6Scz6ccdn");
         RenderLink("  Follow me on Twitter", "https://twitter.com/@HiPeanutBuddha");
+        
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+        
+        HorizontalRule();
+
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+
+        githubUpdateChecker.Render();
 
         isDryRun = false;
 

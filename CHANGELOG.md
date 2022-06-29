@@ -1,3 +1,7 @@
+# 1.5.0
+
+- auto-check for updates
+
 # 1.4.0
 
 - select all materials button
