@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 
-namespace VRCQuestifyer {
+namespace PeanutTools_VRC_Questifyer {
     public class Utils {
         public static string GetGameObjectPath(GameObject obj)
         {
@@ -13,6 +13,26 @@ namespace VRCQuestifyer {
                 path = "/" + obj.name + path;
             }
             return path;
+        }
+
+        public static GameObject FindGameObjectByPath(string pathToGameObject) {
+            GameObject[] rootGameObjects = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects();
+
+            foreach (GameObject rootGameObject in rootGameObjects) {
+                if (GetGameObjectPath(rootGameObject) == pathToGameObject) {
+                    return rootGameObject;
+                }
+
+                Transform[] transforms = rootGameObject.GetComponentsInChildren<Transform>(true);
+                
+                foreach (Transform transform in transforms) {
+                    if (GetGameObjectPath(transform.gameObject) == pathToGameObject) {
+                        return transform.gameObject;
+                    }
+                }
+            }
+
+            return null;
         }
 
         // does NOT start with slash

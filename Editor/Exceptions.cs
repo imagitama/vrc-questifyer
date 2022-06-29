@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 
-namespace VRCQuestifyer {
+namespace PeanutTools_VRC_Questifyer {
     public class FailedToSwitchMaterialException : System.Exception {
         public FailedToSwitchMaterialException(string message) : base(message) {
         }

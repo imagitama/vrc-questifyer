@@ -24,7 +24,7 @@ using VRCSDK2;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace VRCQuestifyer {
+namespace PeanutTools_VRC_Questifyer {
     class ActionJson {
         public string type;
         public JObject data;

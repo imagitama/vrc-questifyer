@@ -2,6 +2,8 @@
 
 - auto-check for updates
 - fixed number of PhysBones incorrectly showing 0
+- change PhysBones editor output
+- automatically inspect after build avatar
 
 # 1.4.0
 
