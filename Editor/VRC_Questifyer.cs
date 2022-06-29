@@ -85,20 +85,27 @@ public class VRC_Questifyer : EditorWindow
         var window = GetWindow<VRC_Questifyer>();
         window.titleContent = new GUIContent("VRC Questifyer");
         window.minSize = new Vector2(250, 50);
+        SetupAutoUpdate();
+    }
 
-        githubUpdateChecker = new GitHub_Update_Checker() {
-            githubOwner = "imagitama",
-            githubRepo = "vrc-questifyer",
-            currentVersion = File.ReadAllText("Assets/PeanutTools/VRC_Questifyer/VERSION.txt", System.Text.Encoding.UTF8)
-        };
+    static void SetupAutoUpdate() {
+        if (githubUpdateChecker == null) {
+            githubUpdateChecker = new GitHub_Update_Checker() {
+                githubOwner = "imagitama",
+                githubRepo = "vrc-questifyer",
+                currentVersion = File.ReadAllText("Assets/PeanutTools/VRC_Questifyer/VERSION.txt", System.Text.Encoding.UTF8)
+            };
+        }
     }
 
     void Awake() {
         LoadActions();
+        SetupAutoUpdate();
     }
 
     void OnFocus() {
         LoadActions();
+        SetupAutoUpdate();
     }
 
     void HorizontalRule() {
@@ -126,6 +133,8 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
 
         GUILayout.Label("Step 1: Select your avatar", EditorStyles.boldLabel);
+        
+        EditorGUILayout.Space();
 
         sourceVrcAvatarDescriptor = (VRCAvatarDescriptor)EditorGUILayout.ObjectField("Avatar", sourceVrcAvatarDescriptor, typeof(VRCAvatarDescriptor));
         
@@ -202,8 +211,10 @@ public class VRC_Questifyer : EditorWindow
         
         VRCPhysBone[] physBones = sourceVrcAvatarDescriptor != null ? GetPhysBonesInTransform(sourceVrcAvatarDescriptor.transform) : new VRCPhysBone[0];
 
-        int remainingPhysBonesCount = isToKeepEachPhysBone.ToList().Where(x => x == true).ToArray().Length;
+        PopulatePhysBones(physBones);
 
+        int remainingPhysBonesCount = GetRemainingNumberOfPhysBones();
+        
         if (physBones.Length > 0) {
             if (remainingPhysBonesCount > 8) {
                 RenderErrorMessage("Number of PhysBones (" + remainingPhysBonesCount + ") is greater than the limit (8)");
@@ -356,23 +367,24 @@ public class VRC_Questifyer : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.Space();
 
-        githubUpdateChecker.Render();
+        if (githubUpdateChecker != null) {
+            githubUpdateChecker.Render();
+        }
 
         isDryRun = false;
 
         EditorGUILayout.EndScrollView();
     }
 
+    int GetRemainingNumberOfPhysBones() {
+        return isToKeepEachPhysBone.ToList().Where(x => x == true).ToArray().Length;
+    }
+
     VRCPhysBone[] GetPhysBonesInTransform(Transform root) {
         return root.gameObject.GetComponentsInChildren<VRCPhysBone>(true);
     }
 
-    void RenderPhysBonesEditor(VRCPhysBone[] physBones) {
-        if (sourceVrcAvatarDescriptor == null) {
-            return;
-        }
-
-
+    void PopulatePhysBones(VRCPhysBone[] physBones) {
         if (isToKeepEachPhysBone.Length != physBones.Length) {
             isToKeepEachPhysBone = new bool[physBones.Length];
 
@@ -380,6 +392,14 @@ public class VRC_Questifyer : EditorWindow
                 isToKeepEachPhysBone[i] = true;
             }
         }
+    }
+
+    void RenderPhysBonesEditor(VRCPhysBone[] physBones) {
+        if (sourceVrcAvatarDescriptor == null) {
+            return;
+        }
+
+        PopulatePhysBones(physBones);
 
         int idx = 0;
         Dictionary<Transform, int> componentIdxPerTransform = new Dictionary<Transform, int>();

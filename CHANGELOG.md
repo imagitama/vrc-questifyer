@@ -1,6 +1,7 @@
 # 1.5.0
 
 - auto-check for updates
+- fixed number of PhysBones incorrectly showing 0
 
 # 1.4.0
 
