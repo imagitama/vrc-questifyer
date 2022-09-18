@@ -1,3 +1,7 @@
+# 1.6.0
+
+- removed all JSON file operations (please contact me if you actually used this feature)
+
 # 1.5.0
 
 - auto-check for updates

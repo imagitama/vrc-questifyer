@@ -21,20 +21,8 @@ using VRCStation = VRC.SDK3.Avatars.Components.VRCStation;
 using VRC.SDK3.Validation;
 using VRC.Core;
 using VRCSDK2;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace PeanutTools_VRC_Questifyer {
-    class ActionJson {
-        public string type;
-        public JObject data;
-        public bool performAtEnd;
-    }
-
-    class ActionsJson {
-        public ActionJson[] actions;
-    }
-
     class Action {
         public bool performAtEnd;
     }

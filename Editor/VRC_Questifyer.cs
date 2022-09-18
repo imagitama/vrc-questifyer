@@ -30,9 +30,6 @@ using VRC.Core;
 using VRCSDK2;
 using VRC.SDK3.Dynamics.PhysBone.Components;
 
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-
 using PeanutTools_VRC_Questifyer;
 
 public class VRC_Questifyer : EditorWindow
@@ -104,12 +101,10 @@ public class VRC_Questifyer : EditorWindow
     }
 
     void Awake() {
-        LoadActions();
         SetupAutoUpdate();
     }
 
     void OnFocus() {
-        LoadActions();
         SetupAutoUpdate();
     }
 
@@ -162,15 +157,6 @@ public class VRC_Questifyer : EditorWindow
 
         CustomGUI.LineGap();
 
-        CustomGUI.BoldLabel("Step 3: Configure manual actions (optional)");
-        CustomGUI.ItalicLabel("Any additional actions you usually do by hand");
-        
-        CustomGUI.SmallLineGap();
-
-        RenderActions();
-
-        CustomGUI.SmallLineGap();
-
         if (isCreateFormVisible) {
             RenderCreateActionForm();
             
@@ -191,7 +177,7 @@ public class VRC_Questifyer : EditorWindow
 
         CustomGUI.LineGap();
 
-        CustomGUI.BoldLabel("Step 4: Remove PhysBones");
+        CustomGUI.BoldLabel("Step 3: Remove PhysBones");
         CustomGUI.ItalicLabel("Delete PhysBones to reach the limit (8)");
 
         CustomGUI.LineGap();
@@ -1068,8 +1054,6 @@ public class VRC_Questifyer : EditorWindow
         List<Action> newActions = actions.ToList();
         newActions.Add(action);
         actions = newActions;
-
-        SaveActions();
     }
 
     void RenderActions() {
@@ -1208,8 +1192,6 @@ public class VRC_Questifyer : EditorWindow
         List<Action> newActions = actions.ToList();
         newActions.Remove(action);
         actions = newActions;
-
-        SaveActions();
     }
 
     void MoveActionUp(Action action) {
@@ -1220,8 +1202,6 @@ public class VRC_Questifyer : EditorWindow
         newActions.Remove(action);
         newActions.Insert(idx - 1, action);
         actions = newActions;
-
-        SaveActions();
     }
 
     void MoveActionDown(Action action) {
@@ -1232,14 +1212,11 @@ public class VRC_Questifyer : EditorWindow
         newActions.Remove(action);
         newActions.Insert(idx + 1, action);
         actions = newActions;
-
-        SaveActions();
     }
 
     void Questify() {
         successState = SuccessStates.Unknown;
 
-        LoadActions();
         ClearErrors();
 
         Debug.Log("Found " + actions.Count + " from filesystem");
@@ -1406,131 +1383,8 @@ public class VRC_Questifyer : EditorWindow
         renderer.sharedMaterials = existingMaterials;
     }
 
-    void CreateActionsFileIfNoExist() {
-        try {
-            string pathToJsonFile = Application.dataPath + "/VRC_Questifyer_Data.json";
-            File.ReadAllText(pathToJsonFile);
-        } catch (FileNotFoundException exception) {
-            Debug.Log("JSON file does not exist, creating...");
-            SaveActions();
-        }
-    }
-
-    void LoadActions() {
-        CreateActionsFileIfNoExist();
-
-        string pathToJsonFile = Application.dataPath + "/VRC_Questifyer_Data.json";
-        string json = File.ReadAllText(pathToJsonFile);
-
-        ActionsJson actionsData = JsonConvert.DeserializeObject<ActionsJson>(json);
-
-        if (actionsData.actions == null) {
-            throw new System.Exception("Actions in JSON is missing!");
-        }
-
-        actions = actionsData.actions.Select(actionData => ActionJsonToAction(actionData)).ToList();
-    }
-
-    void SaveActions() {
-        string pathToJsonFile = Application.dataPath + "/VRC_Questifyer_Data.json";
-
-        ActionsJson actionsForJson = new ActionsJson() {
-            actions = actions.Select(action => ActionToJson(action)).ToArray()
-        };
-
-        string json = JsonConvert.SerializeObject(actionsForJson, Newtonsoft.Json.Formatting.Indented);
-
-        File.WriteAllText(pathToJsonFile, json);
-
-        ClearErrors();
-    }
-
     void ClearErrors() {
         errors = new List<System.Exception>();
-    }
-
-    // TODO: Add as methods to Action class
-    ActionJson ActionToJson(Action action) {
-        ActionJson actionJson;
-
-        if (action is SwitchToMaterialAction) {
-            actionJson = new ActionJson() {
-                type = Types.SwitchToMaterial.ToString(),
-                data = JObject.FromObject(new {
-                    pathToRenderer = (action as SwitchToMaterialAction).pathToRenderer,
-                    pathToMaterial = (action as SwitchToMaterialAction).pathToMaterial,
-                    materialIndex = (action as SwitchToMaterialAction).materialIndex.ToString()
-                })
-            };
-        } else if (action is RemoveGameObjectAction) {
-            actionJson = new ActionJson() {
-                type = Types.RemoveGameObject.ToString(),
-                data = JObject.FromObject(new {
-                    pathToGameObject = (action as RemoveGameObjectAction).pathToGameObject
-                })
-            };
-        } else if (action is RemovePhysBoneAction) {
-            actionJson = new ActionJson() {
-                type = Types.RemovePhysBone.ToString(),
-                data = JObject.FromObject(new {
-                    pathToGameObject = (action as RemovePhysBoneAction).pathToGameObject,
-                    physBoneIndex = (action as RemovePhysBoneAction).physBoneIndex.ToString()
-                })
-            };
-        } else if (action is RemoveAllPhysBonesAction) {
-            actionJson = new ActionJson() {
-                type = Types.RemoveAllPhysBones.ToString(),
-                data = JObject.FromObject(new {
-                    pathToGameObject = (action as RemoveAllPhysBonesAction).pathToGameObject
-                })
-            };
-        } else {
-            throw new System.Exception("Cannot convert action to JSON: unknown type " + nameof(action));
-        }
-
-        actionJson.performAtEnd = action.performAtEnd;
-
-        return actionJson;
-    }
-
-    Action ActionJsonToAction(ActionJson actionJson) {
-        Action action;
-
-        Types type = (Types)Types.Parse(typeof(Types), actionJson.type);
-        JObject jsonObject = actionJson.data;
-
-        switch (type) {
-            case Types.SwitchToMaterial:
-                action = new SwitchToMaterialAction() {
-                    pathToRenderer = (string)jsonObject["pathToRenderer"],
-                    pathToMaterial = (string)jsonObject["pathToMaterial"],
-                    materialIndex = (int)jsonObject["materialIndex"]
-                };
-                break;
-            case Types.RemoveGameObject:
-                action = new RemoveGameObjectAction() {
-                    pathToGameObject = (string)jsonObject["pathToGameObject"]
-                };
-                break;
-            case Types.RemovePhysBone:
-                action = new RemovePhysBoneAction() {
-                    pathToGameObject = (string)jsonObject["pathToGameObject"],
-                    physBoneIndex = (int)jsonObject["physBoneIndex"]
-                };
-                break;
-            case Types.RemoveAllPhysBones:
-                action = new RemoveAllPhysBonesAction() {
-                    pathToGameObject = (string)jsonObject["pathToGameObject"]
-                };
-                break;
-            default:
-                throw new System.Exception("Cannot convert action JSON to action: unknown type " + actionJson.type);
-                break;
-        }
-
-        action.performAtEnd = actionJson.performAtEnd;
-
-        return action;
     }
 
     GameObject CreateQuestAvatar(VRCAvatarDescriptor sourceAvatar) {
