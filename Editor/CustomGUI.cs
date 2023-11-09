@@ -26,8 +26,22 @@ namespace PeanutTools_VRC_Questifyer {
             GUILayout.Label(text, italicStyle);
         }
 
+        public static void MediumLabel(string text) {
+            GUIStyle italicStyle = new GUIStyle(GUI.skin.label);
+            italicStyle.fontSize = 16;
+            GUILayout.Label(text, italicStyle);
+        }
+
         public static void BoldLabel(string text, params GUILayoutOption[] options) {
             GUILayout.Label(text, EditorStyles.boldLabel, options);
+        }
+
+        public static void FocusableLabel(string text, GameObject gameObjectToFocus) {
+            EditorGUILayout.LabelField(new GUIContent(text), EditorStyles.label);
+
+            if (Event.current.type == EventType.MouseDown && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition)) {
+                Utils.FocusGameObject(gameObjectToFocus);
+            }
         }
 
         public static void MyLinks(string repoName) {

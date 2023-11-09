@@ -1,3 +1,7 @@
+# 2.0.0
+
+- component-based
+
 # 1.6.0
 
 - removed all JSON file operations (please contact me if you actually used this feature)

@@ -2,20 +2,29 @@
 
 A Unity plugin that makes it easy to create a Quest version of a VRChat avatar.
 
-Tested with the Canis Woof by Rezillo Ryker in Unity 2019.4.31f1 with VRC SDK 2022.04.21.03.29.
+Tested with the Airplane Dragon avatar in Unity 2019.4.31f1 with VRC SDK 3.4.1 (VCC).
 
 ## Steps
 
-Start in Android (Quest) mode.
+1. Install the package into your project
+2. Right click any object in your scene (eg. your "Body") and add the **VRC Questify** component
+3. Add actions that will automatically apply when you try and upload your Quest avatar
 
-1. Install the plugin `.unitypackage`
-2. Duplicate the scene that contains your PC avatar (tip: rename it with "Quest" on the end) and open it
-3. Open PeanutTools -> VRC Questifyer
-4. Drag your avatar into the field
-5. Select the settings you want
-6. Click "Questify"
+You can also open the main window by going to PeanutTools -> VRC Questifyer. It gives you an overview of everything in your scene.
 
-It will keep the original avatar in the scene so that you can repeat the process as many times as you like.
+### Actions
+
+#### Switch To Material
+
+It overrides all materials of the current renderer (mesh, particle system, etc.) with the provided materials.
+
+#### Remove Game Object
+
+Deletes the object.
+
+#### Remove Component
+
+Deletes the specified components from the game object. Useful for removing VRChat PhysBones, dynamic lights, constraints or other PC-only components.
 
 ## Development
 
