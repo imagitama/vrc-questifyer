@@ -1,0 +1,17 @@
+{
+  "name": "com.imagitama.vrcquestifyer",
+  "displayName": "VRC Questifyer",
+  "version": "2.0.0",
+  "author": {
+    "name": "Jared Williams",
+    "email": "spam@jaredwilliams.com.au"
+  },
+  "unity": "2022",
+  "description": "A Unity plugin that makes it easy to create a Quest version of a VRChat avatar.",
+  "vpmDependencies": {
+    "com.vrchat.avatars": "3.7.x"
+  },
+  "url": "https://github.com/imagitama/vrc-questifyer/releases/download/2.0.0/peanuttools_vrcquestify_2.0.0.zip",
+  "changelogUrl": "https://github.com/imagitama/vrc-questifyer/blob/master/CHANGELOG.md",
+  "license": "MIT"
+}

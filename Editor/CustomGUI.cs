@@ -2,8 +2,8 @@ using UnityEditor;
 using UnityEngine;
 using VRC.SDK3.Avatars.ScriptableObjects;
 
-namespace PeanutTools_VRC_Questifyer {
-    class CustomGUI {
+namespace PeanutTools_VRCQuestifyer {
+    public static class CustomGUI {
         public static void SmallLineGap() {
             EditorGUILayout.Space();
             EditorGUILayout.Space();
@@ -21,9 +21,34 @@ namespace PeanutTools_VRC_Questifyer {
         }
 
         public static void LargeLabel(string text) {
-            GUIStyle italicStyle = new GUIStyle(GUI.skin.label);
-            italicStyle.fontSize = 20;
-            GUILayout.Label(text, italicStyle);
+            GUIStyle style = new GUIStyle(GUI.skin.label);
+            style.fontSize = 20;
+            GUILayout.Label(text, style);
+        }
+
+        public static void MediumLabel(string text) {
+            GUIStyle style = new GUIStyle(GUI.skin.label);
+            style.fontSize = 16;
+            GUILayout.Label(text, style);
+        }
+
+        public static void MediumClickableLabel(string text, GameObject gameObject) {
+            GUIStyle style = new GUIStyle(GUI.skin.label);
+            style.fontSize = 16;
+            
+            GUILayout.Label(text, style);
+
+            Rect labelRect = GUILayoutUtility.GetLastRect();
+
+            if (Event.current.type == EventType.MouseUp && labelRect.Contains(Event.current.mousePosition)) {
+                // Selection.activeGameObject = gameObject;
+                Utils.Ping(gameObject);
+            }
+        }
+
+        public static void Label(string text) {
+            GUIStyle style = new GUIStyle(GUI.skin.label);
+            GUILayout.Label(text, style);
         }
 
         public static void BoldLabel(string text, params GUILayoutOption[] options) {
@@ -73,6 +98,10 @@ namespace PeanutTools_VRC_Questifyer {
             return GUILayout.Button(label, GUILayout.Width(150), GUILayout.Height(25));
         }
 
+        public static bool StandardButtonWide(string label) {
+            return GUILayout.Button(label, GUILayout.Width(200), GUILayout.Height(25));
+        }
+
         public static bool TinyButton(string label) {
             return GUILayout.Button(label, GUILayout.Width(50), GUILayout.Height(15));
         }
@@ -118,6 +147,18 @@ namespace PeanutTools_VRC_Questifyer {
             GUIStyle guiStyle = new GUIStyle(GUI.skin.label);
             guiStyle.normal.textColor = new Color(1.0f, 1.0f, 0.5f);
             GUILayout.Label(message, guiStyle);
+        }
+
+        public static bool Checkbox(string label, bool value) {
+            return EditorGUILayout.Toggle(label, value);
+        }
+
+        public static string TextInput(string label, string value) {
+            return EditorGUILayout.TextField(label, value);
+        }
+
+        public static float FloatInput(string label, float value) {
+            return EditorGUILayout.FloatField(label, value);
         }
     }
 }

@@ -2,23 +2,52 @@
 
 A Unity plugin that makes it easy to create a Quest version of a VRChat avatar.
 
-Tested with the Canis Woof by Rezillo Ryker in Unity 2019.4.31f1 with VRC SDK 2022.04.21.03.29.
+It adds special components that you can add to your avatar or anything inside of it which lets you:
 
-## Steps
+- switch materials to Quest-friendly copies
+- remove components
+- remove blacklisted components (eg. realtime lights)
+- rename objects
 
-Start in Android (Quest) mode.
+Tested in Unity 2022.3.22f1 with VRC SDK 3.7.1 (Oct 2024).
 
-1. Install the plugin `.unitypackage`
-2. Duplicate the scene that contains your PC avatar (tip: rename it with "Quest" on the end) and open it
-3. Open PeanutTools -> VRC Questifyer
-4. Drag your avatar into the field
-5. Select the settings you want
-6. Click "Questify"
+## Usage
 
-It will keep the original avatar in the scene so that you can repeat the process as many times as you like.
+**Always backup your project before using any 3rd party Unity plugins!**
 
-## Development
+1. Import Unity package
+2. Go to Tools -> PeanutTools -> VRC Questifyer
+3. Drag your avatar into the slot and click the big button (it will add an object called Questifyer inside your avatar)
+4. Switch to Android, go to the component, click "Perform Actions" and it will do the rest
 
-## Release
+## Components
 
-Package PeanutTools/VRC\*Questifyer as a `.unitypackage`. Rename to `peanuttools_vrcquestifyer_$version.unitypackage`
+### Avatar
+
+<img src="Screenshots/component_avatar.png" width="400" />
+
+The main component. It gives you an overview of all actions found on the avatar and gives you a button to perform everything.
+
+### Switch Materials
+
+Switch materials in each material slot. Create missing Quest materials by copying the existing one. Finds any existing materials.
+
+<img src="Screenshots/component_switch_materials.png" width="400" />
+
+### Remove Blacklisted Components
+
+<img src="Screenshots/component_remove_blacklisted_components.png" width="400" />
+
+Removes any "non-whitelisted" components such as realtime lights, cloth, etc. VRCFury components are ignored.
+
+### Remove Components
+
+<img src="Screenshots/component_remove_components.png" width="400" />
+
+Removes a specific component from an object. If multiple components have the same kind, you can specify an index.
+
+### Rename
+
+<img src="Screenshots/component_rename.png" width="400" />
+
+Renames an object. Optionally adding it as a prefix or suffix.

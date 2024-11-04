@@ -1,3 +1,10 @@
+# 2.0.0
+
+- update to Unity 2022.3.22f1 and VRCSDK 3.7.1 (Oct 2024)
+- moved editor window into Tools menu
+- moved actions from editor window into components
+- added public methods to Questify from other scripts
+
 # 1.6.0
 
 - removed all JSON file operations (please contact me if you actually used this feature)
