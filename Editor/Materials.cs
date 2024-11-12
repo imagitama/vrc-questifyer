@@ -86,54 +86,39 @@ namespace PeanutTools_VRCQuestifyer {
         public static string GetRealPathInsideAssetsForQuestVersionOfMaterial(Material material) {
             string materialPath = AssetDatabase.GetAssetPath(material);
 
-            // if a material "instance" or something else weird
             if (string.IsNullOrEmpty(materialPath)) {
                 return "";
             }
 
             string directory = System.IO.Path.GetDirectoryName(materialPath);
-            string fileName = System.IO.Path.GetFileName(materialPath);
             string fileNameWithoutExtension = System.IO.Path.GetFileNameWithoutExtension(materialPath);
             string extension = System.IO.Path.GetExtension(materialPath);
             string questDirectory = System.IO.Path.Combine(directory, questDirectoryName);
 
+            bool MatchesQuestPattern(string path) {
+                string nameWithoutExtension = System.IO.Path.GetFileNameWithoutExtension(path);
+                return nameWithoutExtension.Contains(fileNameWithoutExtension) && nameWithoutExtension.Contains("Quest");
+            }
+
             if (AssetDatabase.IsValidFolder(questDirectory)) {
-                var materialPathWithSuffix = System.IO.Path.Combine(
-                    questDirectory,
-                    fileNameWithoutExtension + questMaterialSuffix + extension
-                );
-
-                var assetWithSuffix = AssetDatabase.LoadAssetAtPath<Material>(materialPathWithSuffix);
-
-                if (assetWithSuffix != null) {
-                    return GetPathInsideAssetsFromPathInProject(materialPathWithSuffix);
-                }
-
-                var materialPathInQuestDirWithoutSuffix = System.IO.Path.Combine(
-                    questDirectory,
-                    fileName
-                );
-
-                var assetInQuestDirWithoutSuffix = AssetDatabase.LoadAssetAtPath<Material>(materialPathInQuestDirWithoutSuffix);
-
-                if (assetInQuestDirWithoutSuffix != null) {
-                    return GetPathInsideAssetsFromPathInProject(materialPathInQuestDirWithoutSuffix);
+                string[] questFiles = System.IO.Directory.GetFiles(questDirectory);
+                foreach (string path in questFiles) {
+                    if (MatchesQuestPattern(path) && AssetDatabase.LoadAssetAtPath<Material>(path) != null) {
+                        return GetPathInsideAssetsFromPathInProject(path);
+                    }
                 }
             }
-            
-            var materialPathWithSuffixInSameDir = System.IO.Path.Combine(
-                System.IO.Path.GetDirectoryName(materialPath),
-                fileNameWithoutExtension + questMaterialSuffix + extension
-            );
 
-            var assetWithSuffixInSameDir = AssetDatabase.LoadAssetAtPath<Material>(materialPathWithSuffixInSameDir);
-
-            if (assetWithSuffixInSameDir != null) {
-                return GetPathInsideAssetsFromPathInProject(materialPathWithSuffixInSameDir);
+            string[] filesInSameDirectory = System.IO.Directory.GetFiles(directory);
+            foreach (string path in filesInSameDirectory) {
+                if (MatchesQuestPattern(path) && AssetDatabase.LoadAssetAtPath<Material>(path) != null) {
+                    return GetPathInsideAssetsFromPathInProject(path);
+                }
             }
 
             return "";
         }
+
 
         public static string GetVirtualPathInsideAssetsForQuestVersionOfMaterial(Material material, bool createInQuestFolder, bool addQuestSuffix) {
             string materialPath = AssetDatabase.GetAssetPath(material);

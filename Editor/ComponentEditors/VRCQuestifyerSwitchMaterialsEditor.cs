@@ -179,8 +179,8 @@ public class VRCQuestifyerSwitchMaterialsEditor : VRCQuestifyerBaseEditor {
         CustomGUI.LineGap();
 
         alwaysOverwriteWithExistingMaterialsProperty.boolValue = CustomGUI.Checkbox("Always overwrite with existing", alwaysOverwriteWithExistingMaterialsProperty.boolValue);
-        createInQuestFolderProperty.boolValue = CustomGUI.Checkbox("Create inside folder 'Quest'", createInQuestFolderProperty.boolValue);
-        addQuestSuffixProperty.boolValue = CustomGUI.Checkbox("Add 'Quest' to end of name", addQuestSuffixProperty.boolValue);
+        createInQuestFolderProperty.boolValue = CustomGUI.Checkbox("Create inside Quest folder (recommended)", createInQuestFolderProperty.boolValue);
+        addQuestSuffixProperty.boolValue = CustomGUI.Checkbox("Add Quest suffix (recommended)", addQuestSuffixProperty.boolValue);
         useToonShaderProperty.boolValue = CustomGUI.Checkbox("Use toon shader", useToonShaderProperty.boolValue);
         
         CustomGUI.LineGap();
