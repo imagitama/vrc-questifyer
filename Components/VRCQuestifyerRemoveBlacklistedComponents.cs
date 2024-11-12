@@ -19,7 +19,7 @@ public class VRCQuestifyerRemoveBlacklistedComponents : VRCQuestifyerBase {
         var whitelistSdk3 = AvatarValidation.ComponentTypeWhiteListSdk3;
         var whitelistedComponentNames = whitelistCommon.ToList().Concat(whitelistSdk3).ToList();
 
-        var allComponentsInDescendants = transformToUse.GetComponentsInChildren<Component>();
+        var allComponentsInDescendants = transformToUse.GetComponentsInChildren<Component>(includeInactive: true);
 
         var components = new List<Component>();
 

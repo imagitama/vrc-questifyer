@@ -1,10 +1,11 @@
 # 2.1.0
 
-- added button to Switch Materials component to force max compression
-- added button to Switch Materials component to force 512x512 resolution
-- changed existing material detection to search for any material with "Quest" in name
 - fixed being able to add Base component
-- changed Remove Components component to only show index if more than 1
+- added button to "Switch Materials" component to force max compression
+- added button to "Switch Materials" component to force 512x512 resolution
+- changed "Switch Materials" existing material detection to search for any material with "Quest" in name
+- changed "Remove Components" component to only show index if more than 1
+- fixed "Remove Blacklisted Components" component not including disabled objects
 
 # 2.0.0
 
