@@ -54,7 +54,7 @@ public class VRCQuestifyerRemoveComponentsEditor : VRCQuestifyerBaseEditor {
                 GUI.DrawTexture(iconRect, icon, ScaleMode.ScaleToFit);
             }
 
-            EditorGUI.LabelField(new Rect(rect.x, rect.y, columnWidth - 5, EditorGUIUtility.singleLineHeight), $"      {typeName}{(componentsOfType.Count > 0 ? $" ({componentIndex})" : "")}");
+            EditorGUI.LabelField(new Rect(rect.x, rect.y, columnWidth - 5, EditorGUIUtility.singleLineHeight), $"      {typeName}{(componentsOfType.Count > 1 ? $" ({componentIndex})" : "")}");
 
             bool existsInDeletions = false;
 
