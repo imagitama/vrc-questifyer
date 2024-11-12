@@ -156,6 +156,24 @@ public class VRCQuestifyerSwitchMaterialsEditor : VRCQuestifyerBaseEditor {
         
         CustomGUI.LineGap();
         
+        CustomGUI.MediumLabel("Tools");
+
+        CustomGUI.LineGap();
+
+        if (CustomGUI.StandardButtonWide("Force Max Compression")) {
+            ForceMaxCompression();
+        }
+        CustomGUI.ItalicLabel("Lowers final avatar size by using compression (recommended).");
+
+        CustomGUI.SmallLineGap();
+
+        if (CustomGUI.StandardButtonWide("Force 512x512")) {
+            ForceSmallTextureSize();
+        }
+        CustomGUI.ItalicLabel("Lowers final avatar size by resizing texture (recommended).");
+
+        CustomGUI.LineGap();
+        
         CustomGUI.MediumLabel("Settings");
 
         CustomGUI.LineGap();
@@ -213,6 +231,59 @@ public class VRCQuestifyerSwitchMaterialsEditor : VRCQuestifyerBaseEditor {
         CustomGUI.LineGap();
     }
 
+    void ForceMaxCompression() {
+        var component = target as VRCQuestifyerSwitchMaterials;
+
+        foreach (var materialSwitch in component.materialSwitches) {
+            var material = materialSwitch.newMaterial;
+
+            if (material == null) {
+                continue;
+            }
+
+            var textureImporters = Materials.GetTextureImportersForMaterial(material);
+
+            foreach (var textureImporter in textureImporters) {
+                TextureImporterPlatformSettings androidSettings = textureImporter.GetPlatformTextureSettings("Android");
+                androidSettings.overridden = true;
+                androidSettings.format = TextureImporterFormat.ASTC_4x4;
+                androidSettings.compressionQuality = (int)TextureCompressionQuality.Best;
+
+                Debug.Log($"VRCQuestifyer :: Force max compression for '{textureImporter.assetPath}'");
+
+                textureImporter.SetPlatformTextureSettings(androidSettings);
+
+                AssetDatabase.ImportAsset(textureImporter.assetPath, ImportAssetOptions.ForceUpdate);
+            }
+        }
+    }
+
+    void ForceSmallTextureSize() {
+        var component = target as VRCQuestifyerSwitchMaterials;
+
+        foreach (var materialSwitch in component.materialSwitches) {
+            var material = materialSwitch.newMaterial;
+
+            if (material == null) {
+                continue;
+            }
+
+            var textureImporters = Materials.GetTextureImportersForMaterial(material);
+
+            foreach (var textureImporter in textureImporters) {
+                TextureImporterPlatformSettings androidSettings = textureImporter.GetPlatformTextureSettings("Android");
+                androidSettings.overridden = true;
+                androidSettings.maxTextureSize = 512;
+
+                Debug.Log($"VRCQuestifyer :: Force small texture size for '{textureImporter.assetPath}'");
+
+                textureImporter.SetPlatformTextureSettings(androidSettings);
+
+                AssetDatabase.ImportAsset(textureImporter.assetPath, ImportAssetOptions.ForceUpdate);
+            }
+        }
+    }
+
     struct TextureAnalysis {
         public string propertyName;
         public Texture texture;
@@ -223,55 +294,37 @@ public class VRCQuestifyerSwitchMaterialsEditor : VRCQuestifyerBaseEditor {
     }
 
     List<TextureAnalysis> GetTextureAnalysis(Material material) {
+        var results = new List<TextureAnalysis>();
+
         if (material == null) {
             return null;
         }
 
-        var results = new List<TextureAnalysis>();
+        var texturesWithPropName = Materials.GetTexturesWithPropertyNameForMaterial(material);
 
-        Shader shader = material.shader;
+        foreach (var textureWithPropName in texturesWithPropName) {
+            var textureImporter = Materials.GetTextureImporterForTexture(textureWithPropName.texture);
 
-        for (int i = 0; i < ShaderUtil.GetPropertyCount(shader); i++) {
-            if (ShaderUtil.GetPropertyType(shader, i) == ShaderUtil.ShaderPropertyType.TexEnv) {
-                string propertyName = ShaderUtil.GetPropertyName(shader, i);
-
-                Texture texture = material.GetTexture(propertyName);
-
-                if (texture == null) {
-                    continue;
-                }
-
-                string pathToAsset = AssetDatabase.GetAssetPath(texture);
-
-                if (pathToAsset == "") {
-                    CustomGUI.RenderErrorMessage("Path empty");
-                    continue;
-                }
-
-                TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(pathToAsset);
-
-                if (importer == null) {
-                    CustomGUI.RenderErrorMessage("Importer null");
-                    continue;
-                }
-
-                int maxTextureSize;
-                TextureImporterFormat textureFormat;
-                int compressionQuality;
-
-                importer.GetPlatformTextureSettings("Android", out maxTextureSize, out textureFormat, out compressionQuality);
-
-                long sizeBytes = EditorTextureUtil.GetStorageMemorySize(texture);
-
-                results.Add(new TextureAnalysis() {
-                    propertyName = propertyName,
-                    texture = texture,
-                    sizeBytes = sizeBytes,
-                    maxTextureSize = maxTextureSize,
-                    textureFormat = textureFormat,
-                    compressionQuality = compressionQuality
-                });
+            if (textureImporter == null) {
+                continue;
             }
+
+            int maxTextureSize;
+            TextureImporterFormat textureFormat;
+            int compressionQuality;
+
+            textureImporter.GetPlatformTextureSettings("Android", out maxTextureSize, out textureFormat, out compressionQuality);
+
+            long sizeBytes = EditorTextureUtil.GetStorageMemorySize(textureWithPropName.texture);
+
+            results.Add(new TextureAnalysis() {
+                propertyName = textureWithPropName.propertyName,
+                texture = textureWithPropName.texture,
+                sizeBytes = sizeBytes,
+                maxTextureSize = maxTextureSize,
+                textureFormat = textureFormat,
+                compressionQuality = compressionQuality
+            });
         }
 
         return results;

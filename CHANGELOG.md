@@ -1,3 +1,8 @@
+# 2.1.0
+
+- added button to Switch Materials component to force max compression
+- added button to Switch Materials component to force 512x512 resolution
+
 # 2.0.0
 
 - update to Unity 2022.3.22f1 and VRCSDK 3.7.1 (Oct 2024)

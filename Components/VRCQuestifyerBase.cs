@@ -10,7 +10,7 @@ using System.Reflection;
 using UnityEngine;
 using VRC.SDKBase;
 
-public class VRCQuestifyerBase : MonoBehaviour, IEditorOnly {
+public abstract class VRCQuestifyerBase : MonoBehaviour, IEditorOnly {
     public Transform overrideTarget;
 
     public virtual void Apply() {

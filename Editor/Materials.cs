@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEditor;
+using UnityEditorInternal;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
@@ -85,7 +86,7 @@ namespace PeanutTools_VRCQuestifyer {
         public static string GetRealPathInsideAssetsForQuestVersionOfMaterial(Material material) {
             string materialPath = AssetDatabase.GetAssetPath(material);
 
-            // if an "instance" or something else weird
+            // if a material "instance" or something else weird
             if (string.IsNullOrEmpty(materialPath)) {
                 return "";
             }
@@ -172,6 +173,96 @@ namespace PeanutTools_VRCQuestifyer {
             );
 
             return materialPathWithSuffixInSameDir;
+        }
+
+        public static List<Texture> GetTexturesForMaterial(Material material) {
+            var results = new List<Texture>();
+
+            Shader shader = material.shader;
+
+            for (int i = 0; i < ShaderUtil.GetPropertyCount(shader); i++) {
+                if (ShaderUtil.GetPropertyType(shader, i) != ShaderUtil.ShaderPropertyType.TexEnv) {
+                    continue;
+                }
+
+                string propertyName = ShaderUtil.GetPropertyName(shader, i);
+
+                Texture texture = material.GetTexture(propertyName);
+
+                if (texture == null) {
+                    continue;
+                }
+
+                results.Add(texture);
+            }
+
+            return results;
+        }
+
+        public class TextureWithPropertyName {
+            public string propertyName;
+            public Texture texture;
+        }
+
+        public static List<TextureWithPropertyName> GetTexturesWithPropertyNameForMaterial(Material material) {
+            var results = new List<TextureWithPropertyName>();
+
+            Shader shader = material.shader;
+
+            for (int i = 0; i < ShaderUtil.GetPropertyCount(shader); i++) {
+                if (ShaderUtil.GetPropertyType(shader, i) != ShaderUtil.ShaderPropertyType.TexEnv) {
+                    continue;
+                }
+
+                string propertyName = ShaderUtil.GetPropertyName(shader, i);
+
+                Texture texture = material.GetTexture(propertyName);
+
+                if (texture == null) {
+                    continue;
+                }
+
+                results.Add(new TextureWithPropertyName() {
+                    propertyName = propertyName,
+                    texture = texture
+                });
+            }
+
+            return results;
+        }
+
+        public static List<TextureImporter> GetTextureImportersForMaterial(Material material) {
+            var textures = GetTexturesForMaterial(material);
+
+            var results = new List<TextureImporter>();
+
+            foreach (var texture in textures) {
+                TextureImporter importer = GetTextureImporterForTexture(texture);
+
+                if (importer == null) {
+                    continue;
+                }
+
+                results.Add(importer);
+            }
+
+            return results;
+        }
+
+        public static TextureImporter GetTextureImporterForTexture(Texture texture) {
+            string pathToAsset = AssetDatabase.GetAssetPath(texture);
+
+            if (pathToAsset == "") {
+                return null;
+            }
+
+            TextureImporter importer = (TextureImporter)TextureImporter.GetAtPath(pathToAsset);
+
+            if (importer == null) {
+                return null;
+            }
+
+            return importer;
         }
     }
 }
