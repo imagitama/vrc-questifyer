@@ -9,9 +9,10 @@ using System.IO;
 using System.Reflection;
 using UnityEngine;
 using VRC.SDKBase;
+using PeanutTools_VRCQuestifyer;
 
 public abstract class VRCQuestifyerBase : MonoBehaviour, IEditorOnly {
-    public Transform overrideTarget;
+    public Transform overrideTarget; // TODO: Change to override getter
 
     public virtual void Apply() {
         // perform the actions on the target
@@ -20,5 +21,9 @@ public abstract class VRCQuestifyerBase : MonoBehaviour, IEditorOnly {
     public virtual bool GetIsValid() {
         // used by "avatar" component to output any issues
         return true;
+    }
+
+    public bool GetIsBeingDeletedByVrcFury() {
+        return VRCFury.GetIsTransformToBeDeletedDuringUpload(this.overrideTarget != null ? this.overrideTarget : this.transform);
     }
 }

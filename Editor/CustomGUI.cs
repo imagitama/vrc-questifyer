@@ -131,22 +131,30 @@ namespace PeanutTools_VRCQuestifyer {
             return "";
         }
 
-        public static void RenderSuccessMessage(string message) {
-             GUIStyle guiStyle = new GUIStyle(GUI.skin.label);
-            guiStyle.normal.textColor = new Color(0.5f, 1.0f, 0.5f);
+        public static void RenderMessage(string message, Color color) {
+            GUIStyle guiStyle = new GUIStyle(GUI.skin.label) {
+                normal = { textColor = color },
+                focused = { textColor = color },
+                active = { textColor = color },
+                hover = { textColor = color },
+                onNormal = { textColor = color },
+                onFocused = { textColor = color },
+                onActive = { textColor = color },
+                onHover = { textColor = color }
+            };
             GUILayout.Label(message, guiStyle);
+        }
+
+        public static void RenderSuccessMessage(string message) {
+            RenderMessage(message, new Color(0.5f, 1.0f, 0.5f));
         }
 
         public static void RenderErrorMessage(string message) {
-            GUIStyle guiStyle = new GUIStyle(GUI.skin.label);
-            guiStyle.normal.textColor = new Color(1.0f, 0.5f, 0.5f);
-            GUILayout.Label(message, guiStyle);
+            RenderMessage(message, new Color(1.0f, 0.5f, 0.5f));
         }
 
         public static void RenderWarningMessage(string message) {
-            GUIStyle guiStyle = new GUIStyle(GUI.skin.label);
-            guiStyle.normal.textColor = new Color(1.0f, 1.0f, 0.5f);
-            GUILayout.Label(message, guiStyle);
+            RenderMessage(message, new Color(1.0f, 1.0f, 0.5f));
         }
 
         public static bool Checkbox(string label, bool value) {

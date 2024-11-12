@@ -55,6 +55,11 @@ public class VRCQuestifyerBaseEditor : Editor
             CustomGUI.LineGap();
         }
 
+        if (component.GetIsBeingDeletedByVrcFury()) {
+            CustomGUI.RenderWarningMessage("Ignored: VRCFury \"Delete During Upload\" component detected in hierarchy");
+            CustomGUI.LineGap();
+        }
+
         RenderGUI();
     }
     

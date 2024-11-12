@@ -125,7 +125,7 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
         var invalidComponents = new List<VRCQuestifyerBase>();
 
         foreach (var componentToCheck in components) {
-            if (!componentToCheck.GetIsValid()) {
+            if (!componentToCheck.GetIsValid() && !componentToCheck.GetIsBeingDeletedByVrcFury()) {
                 invalidComponents.Add(componentToCheck);
             }
         }

@@ -6,7 +6,8 @@
 - changed "Switch Materials" existing material detection to search for any material with "Quest" in name
 - changed "Remove Components" component to only show index if more than 1
 - fixed "Remove Blacklisted Components" component not including disabled objects
-- add issue if using an old Unity constraint
+- add issue if using an old Unity constraints
+- check if gameobject is being deleted by VRCFury and ignore
 
 # 2.0.0
 
