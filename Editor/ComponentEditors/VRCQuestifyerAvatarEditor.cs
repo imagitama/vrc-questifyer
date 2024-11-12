@@ -155,6 +155,24 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
             EditorGUILayout.EndHorizontal();
         }
 
+        List<Component> oldUnityConstraints = Utils.GetAllConstraintComponentsInChildren(vrcAvatarDescriptor.transform);
+
+        foreach (var oldUnityConstraint in oldUnityConstraints) {
+            EditorGUILayout.BeginHorizontal();
+
+            if (CustomGUI.TinyButton("Ping")) {
+                Utils.Ping(oldUnityConstraint.gameObject);
+            }
+
+            if (CustomGUI.TinyButton("View")) {
+                Utils.Inspect(oldUnityConstraint.gameObject);
+            }
+
+            CustomGUI.Label($"{oldUnityConstraint} needs conversion to VRChat constraint (use SDK)");
+
+            EditorGUILayout.EndHorizontal();
+        }
+
         List<VRCPhysBone> physBones = Utils.FindAllComponents<VRCPhysBone>(vrcAvatarDescriptor.transform);
 
         List<VRCQuestifyerRemoveComponents> rccs = Utils.FindAllComponents<VRCQuestifyerRemoveComponents>(vrcAvatarDescriptor.transform);

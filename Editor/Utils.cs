@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEditor;
 using System.IO;
 using System.Collections.Generic;
@@ -182,10 +183,20 @@ namespace PeanutTools_VRCQuestifyer {
             return $"{System.Math.Sign(byteCount) * num} {suf[place]}";
         }
 
-        // public static bool GetIsComponentQuestCompatible(Component component) {
-        //     return component != null &&
-        //         component.GetType() != typeof(Transform)
-        //         & component is IEditorOnly;
-        // }
+        public static List<Component> GetAllConstraintComponentsInChildren(Transform transform) {
+            var constraintComponents = new List<Component>();
+
+            var allComponents = transform.GetComponentsInChildren<Component>(includeInactive: true);
+
+            foreach (var component in allComponents)
+            {
+                if (component is IConstraint constraint)
+                {
+                    constraintComponents.Add(component);
+                }
+            }
+
+            return constraintComponents;
+        }
     }
 }
