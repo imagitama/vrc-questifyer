@@ -8,6 +8,7 @@
 - fixed "Remove Blacklisted Components" component not including disabled objects
 - add issue if using an old Unity constraints
 - check if gameobject is being deleted by VRCFury and ignore
+- added "contacts" to list of issues
 
 # 2.0.0
 

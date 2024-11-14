@@ -11,10 +11,6 @@ public class VRCQuestifyerRemoveBlacklistedComponentsEditor : VRCQuestifyerBaseE
     public override string title { get; set; } = "Remove Blacklisted Components";
 
     public override void RenderGUI() {
-        CustomGUI.MediumLabel("Remove Blacklisted Components");
-
-        CustomGUI.LineGap();
-
         CustomGUI.RenderSuccessMessage("These components will be removed:");
         
         CustomGUI.LineGap();

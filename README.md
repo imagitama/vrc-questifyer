@@ -51,3 +51,9 @@ Removes a specific component from an object. If multiple components have the sam
 <img src="Screenshots/component_rename.png" width="400" />
 
 Renames an object. Optionally adding it as a prefix or suffix.
+
+### Remove
+
+<img src="Screenshots/component_remove.png" width="400" />
+
+Removes an object.

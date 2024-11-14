@@ -22,20 +22,6 @@ public class VRCQuestifyerRenameEditor : VRCQuestifyerBaseEditor {
     }
 
     public override void RenderGUI() {
-        serializedObject.Update();
-
-        var component = target as VRCQuestifyerRename;
-        var transformToUse = component.overrideTarget != null ? component.overrideTarget : component.transform;
-
-        CustomGUI.MediumLabel("Rename");
-        
-        CustomGUI.LineGap();
-
-        newNameProp.stringValue = CustomGUI.TextInput("New name", newNameProp.stringValue);
-        EditorGUILayout.PropertyField(modeProp, new GUIContent("Mode"));
-
-        serializedObject.ApplyModifiedProperties();
-        
         RenderMainGUI();
     }
 
@@ -46,11 +32,7 @@ public class VRCQuestifyerRenameEditor : VRCQuestifyerBaseEditor {
         var originalName = transformToUse.gameObject.name;
 
         var finalName = component.GetFinalName();
-        
-        CustomGUI.LineGap();
 
         CustomGUI.RenderSuccessMessage($"Object will be renamed from '{originalName}' to '{finalName}'");
-        
-        CustomGUI.LineGap();
     }
 }

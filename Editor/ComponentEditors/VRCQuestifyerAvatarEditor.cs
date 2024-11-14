@@ -6,6 +6,12 @@ using VRC.SDK3.Dynamics.PhysBone.Components;
 using System.Collections.Generic;
 using System.Linq;
 
+using VRC.SDKBase.Editor.Validation;
+using VRC.SDKBase.Validation;
+using VRC.SDKBase.Validation.Performance;
+using VRC.SDKBase.Validation.Performance.Stats;
+using VRC.SDK3.Dynamics.Contact.Components;
+
 [CustomEditor(typeof(VRCQuestifyerAvatar))]
 public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
     public override string title { get; set; } = "Avatar";
@@ -15,6 +21,7 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
     SerializedProperty zoomToClonedAvatarProp;
     SerializedProperty removeComponentsProp;
     SerializedProperty moveAvatarBackMetersProp;
+    SerializedProperty moveOriginalProp;
 
     public void OnEnable() {
         base.OnEnable();
@@ -28,6 +35,7 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
         zoomToClonedAvatarProp = serializedObject.FindProperty("zoomToClonedAvatar");
         removeComponentsProp = serializedObject.FindProperty("removeComponents");
         moveAvatarBackMetersProp = serializedObject.FindProperty("moveAvatarBackMeters");
+        moveOriginalProp = serializedObject.FindProperty("moveOriginal");
     }
 
     public override void RenderGUI() {
@@ -41,10 +49,6 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
         EditorGUILayout.ObjectField("Target", vrcAvatarDescriptor, typeof(VRCAvatarDescriptor));
         CustomGUI.ItalicLabel("Leave blank to use this object");
         EditorGUI.EndDisabledGroup();
-
-        CustomGUI.LineGap();
-
-        CustomGUI.MediumLabel("Avatar");
         
         CustomGUI.LineGap();
 
@@ -100,10 +104,6 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
 
         CustomGUI.LineGap();
 
-        RenderActions();
-
-        CustomGUI.LineGap();
-
         CustomGUI.MediumLabel("Settings");
         
         CustomGUI.LineGap();
@@ -112,12 +112,17 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
         hideOriginalAvatarProp.boolValue = CustomGUI.Checkbox("Hide original avatar", hideOriginalAvatarProp.boolValue);
         zoomToClonedAvatarProp.boolValue = CustomGUI.Checkbox("Focus on copy", zoomToClonedAvatarProp.boolValue);
         removeComponentsProp.boolValue = CustomGUI.Checkbox("Remove Questifyer components", removeComponentsProp.boolValue);
-        moveAvatarBackMetersProp.floatValue = CustomGUI.FloatInput("Move original avatar back on Z axis (meters)", moveAvatarBackMetersProp.floatValue);
+        moveAvatarBackMetersProp.floatValue = CustomGUI.FloatInput("Move avatar back on Z axis (meters)", moveAvatarBackMetersProp.floatValue);
+        moveOriginalProp.boolValue = CustomGUI.Checkbox("Move original avatar instead of copy", moveOriginalProp.boolValue);
+
+        CustomGUI.LineGap();
+
+        RenderActions();
 
         serializedObject.ApplyModifiedProperties();
     }
 
-    void RenderIssues() {
+    void RenderComponentValidationIssues() {
         var component = target as VRCQuestifyerAvatar;
         var vrcAvatarDescriptor = Utils.FindComponentInAncestor<VRCAvatarDescriptor>(component.transform);
 
@@ -131,29 +136,31 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
         }
 
         if (invalidComponents.Count == 0) {
+            CustomGUI.LineGap();
+
             CustomGUI.RenderSuccessMessage("All actions are valid and can be performed");
-            return;
-        }
-        
-        CustomGUI.MediumLabel("Issues");
+        } else {
+            foreach (var invalidComponent in invalidComponents) {
+                EditorGUILayout.BeginHorizontal();
 
-        CustomGUI.LineGap();
+                if (CustomGUI.TinyButton("Ping")) {
+                    Utils.Ping(invalidComponent.gameObject);
+                }
 
-        foreach (var invalidComponent in invalidComponents) {
-            EditorGUILayout.BeginHorizontal();
+                if (CustomGUI.TinyButton("View")) {
+                    Utils.Inspect(invalidComponent.gameObject);
+                }
 
-            if (CustomGUI.TinyButton("Ping")) {
-                Utils.Ping(invalidComponent.gameObject);
+                CustomGUI.Label($"{invalidComponent} is invalid");
+
+                EditorGUILayout.EndHorizontal();
             }
-
-            if (CustomGUI.TinyButton("View")) {
-                Utils.Inspect(invalidComponent.gameObject);
-            }
-
-            CustomGUI.Label($"{invalidComponent} is invalid");
-
-            EditorGUILayout.EndHorizontal();
         }
+    }
+
+    void RenderConstraintIssues() {
+        var component = target as VRCQuestifyerAvatar;
+        var vrcAvatarDescriptor = Utils.FindComponentInAncestor<VRCAvatarDescriptor>(component.transform);
 
         List<Component> oldUnityConstraints = Utils.GetAllConstraintComponentsInChildren(vrcAvatarDescriptor.transform);
 
@@ -172,6 +179,80 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
 
             EditorGUILayout.EndHorizontal();
         }
+    }
+
+    void RenderContactIssues() {
+        var component = target as VRCQuestifyerAvatar;
+        var vrcAvatarDescriptor = Utils.FindComponentInAncestor<VRCAvatarDescriptor>(component.transform);
+
+        List<VRCContactReceiver> contacts = Utils.FindAllComponents<VRCContactReceiver>(vrcAvatarDescriptor.transform);
+
+        List<VRCQuestifyerRemoveComponents> rccs = Utils.FindAllComponents<VRCQuestifyerRemoveComponents>(vrcAvatarDescriptor.transform);
+
+        List<VRCContactReceiver> contactsQuestifyWillRemove = new List<VRCContactReceiver>();
+
+        foreach (var rcc in rccs) {
+            var transformToUse = rcc.overrideTarget != null ? rcc.overrideTarget : rcc.transform;
+
+            foreach (var contact in contacts) {
+                if (contact.transform == transformToUse) {
+                    var contactsOnTransform = transformToUse.GetComponents<VRCContactReceiver>().ToList();
+
+                    for (var i = 0; i < contactsOnTransform.Count; i++) {
+                        var contactOnTransform = contactsOnTransform[i];
+
+                        foreach (var componentDeletion in rcc.componentDeletions) {
+                            if (componentDeletion.index == i) {
+                                contactsQuestifyWillRemove.Add(contactOnTransform);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        List<VRCContactReceiver> contactsAfterRemoval = contacts
+            .Where(bone => !contactsQuestifyWillRemove.Contains(bone))
+            .ToList();
+
+        var maxCount = 16; // copied from docs TODO: Use SDK to determine this
+
+        if (contactsAfterRemoval.Count <= maxCount) {
+            return;
+        }
+        
+        CustomGUI.LineGap();
+
+        CustomGUI.RenderErrorMessage($"There are too many Contacts on this avatar ({contacts.Count} total, {contactsAfterRemoval.Count} after questify, max {maxCount}):");
+
+        foreach (var contact in contactsAfterRemoval) {
+            EditorGUILayout.BeginHorizontal();
+
+            if (CustomGUI.TinyButton("Ping")) {
+                Utils.Ping(contact.gameObject);
+            }
+
+            if (CustomGUI.TinyButton("View")) {
+                Utils.Inspect(contact.gameObject);
+            }
+
+            if (CustomGUI.TinyButton("+Rem")) {
+                var removeComponentsComponent = contact.gameObject.GetComponent<VRCQuestifyerRemoveComponents>();
+                if (removeComponentsComponent == null) {
+                    removeComponentsComponent = contact.gameObject.AddComponent<VRCQuestifyerRemoveComponents>();
+                }
+                removeComponentsComponent.AddDeletionForComponent(contact);
+            }
+
+            CustomGUI.Label($"{contact.transform.name}");
+        
+            EditorGUILayout.EndHorizontal();
+        }
+    }
+
+    void RenderPhysBoneIssues() {
+        var component = target as VRCQuestifyerAvatar;
+        var vrcAvatarDescriptor = Utils.FindComponentInAncestor<VRCAvatarDescriptor>(component.transform);
 
         List<VRCPhysBone> physBones = Utils.FindAllComponents<VRCPhysBone>(vrcAvatarDescriptor.transform);
 
@@ -203,13 +284,15 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
             .Where(bone => !physBonesQuestifyWillRemove.Contains(bone))
             .ToList();
 
-        var maxPhysBoneCount = 8;
+        var maxPhysBoneCount = 8; // copied from docs TODO: Use SDK to determine this
 
         if (physBonesAfterRemoval.Count <= maxPhysBoneCount) {
             return;
         }
+        
+        CustomGUI.LineGap();
 
-        CustomGUI.Label($"There are too many PhysBones on this avatar ({physBones.Count} total, {physBonesAfterRemoval.Count} after questify, max {maxPhysBoneCount}):");
+        CustomGUI.RenderErrorMessage($"There are too many PhysBones on this avatar ({physBones.Count} total, {physBonesAfterRemoval.Count} after questify, max {maxPhysBoneCount}):");
 
         foreach (var physBone in physBonesAfterRemoval) {
             EditorGUILayout.BeginHorizontal();
@@ -222,7 +305,7 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
                 Utils.Inspect(physBone.gameObject);
             }
 
-            if (CustomGUI.TinyButton("Add")) {
+            if (CustomGUI.TinyButton("+Rem")) {
                 var removeComponentsComponent = physBone.gameObject.GetComponent<VRCQuestifyerRemoveComponents>();
                 if (removeComponentsComponent == null) {
                     removeComponentsComponent = physBone.gameObject.AddComponent<VRCQuestifyerRemoveComponents>();
@@ -234,6 +317,20 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
         
             EditorGUILayout.EndHorizontal();
         }
+    }
+
+    void RenderIssues() {
+        var component = target as VRCQuestifyerAvatar;
+        var vrcAvatarDescriptor = Utils.FindComponentInAncestor<VRCAvatarDescriptor>(component.transform);
+        
+        CustomGUI.MediumLabel("Issues");
+
+        RenderComponentValidationIssues();
+        RenderConstraintIssues();
+        RenderPhysBoneIssues();
+        RenderContactIssues();
+
+        // TODO: Also check physbone affected transforms, colliders, collision check count, etc.
     }
 
     void RenderActions() {

@@ -122,16 +122,12 @@ public class VRCQuestifyerSwitchMaterialsEditor : VRCQuestifyerBaseEditor {
 
         serializedObject.Update();
 
-        CustomGUI.MediumLabel("Switch Materials");
-
         if (renderer == null) {
             CustomGUI.RenderErrorMessage("No renderer found");
             return;
         }
 
         if (!component.GetIsAnyInvalidMaterials()) {
-            CustomGUI.LineGap();
-
             CustomGUI.RenderSuccessMessage("These materials will be switched:");
 
             CustomGUI.LineGap();
@@ -210,8 +206,6 @@ public class VRCQuestifyerSwitchMaterialsEditor : VRCQuestifyerBaseEditor {
         var component = target as VRCQuestifyerSwitchMaterials;
 
         if (component.GetIsAnyInvalidMaterials()) {
-            CustomGUI.LineGap();
-
             CustomGUI.RenderWarningMessage("At least one invalid material found - this avatar will probably fail upload");
 
             CustomGUI.LineGap();

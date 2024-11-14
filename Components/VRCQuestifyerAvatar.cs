@@ -14,7 +14,8 @@ using VRC.SDKBase;
 public class VRCQuestifyerAvatar : VRCQuestifyerBase {
     public bool replaceExistingQuestAvatars = true;
     public bool hideOriginalAvatar = true;
-    public bool zoomToClonedAvatar = true;
+    public bool zoomToClonedAvatar = false;
     public bool removeComponents = true;
     public float moveAvatarBackMeters = 0f;
+    public bool moveOriginal = true;
 }

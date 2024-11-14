@@ -110,7 +110,6 @@ public class VRCQuestifyerRemoveComponentsEditor : VRCQuestifyerBaseEditor {
     public override void RenderGUI() {
         serializedObject.Update();
 
-        CustomGUI.MediumLabel("Remove Components");
         CustomGUI.ItalicLabel("Warning: Does not check for dependencies (like Cloth depends on SkinnedMeshRenderer)");
 
         var component = target as VRCQuestifyerRemoveComponents;

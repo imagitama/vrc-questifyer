@@ -30,16 +30,20 @@ public class VRCQuestifyerBaseEditor : Editor
     }
 
     public override void OnInspectorGUI() {
+        var component = target as VRCQuestifyerBase;
+
         CustomGUI.LargeLabel("Questifyer");
         
+        CustomGUI.LineGap();
+        
+        CustomGUI.MediumLabel(this.title);
+
         CustomGUI.LineGap();
 
         if (EditorApplication.isPlaying) {
             CustomGUI.ItalicLabel("This component does nothing in play mode");
             return;
         }
-
-        var component = target as VRCQuestifyerBase;
 
         if (canOverrideTarget) {
             var newTarget = (Transform)EditorGUILayout.ObjectField("Target", component.overrideTarget, typeof(Transform));
@@ -57,7 +61,6 @@ public class VRCQuestifyerBaseEditor : Editor
 
         if (component.GetIsBeingDeletedByVrcFury()) {
             CustomGUI.RenderWarningMessage("Ignored: VRCFury \"Delete During Upload\" component detected in hierarchy");
-            CustomGUI.LineGap();
         }
 
         RenderGUI();
