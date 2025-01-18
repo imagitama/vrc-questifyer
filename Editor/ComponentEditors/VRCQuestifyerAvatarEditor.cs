@@ -47,7 +47,13 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
 
         EditorGUI.BeginDisabledGroup(!canOverrideTarget);
         EditorGUILayout.ObjectField("Target", vrcAvatarDescriptor, typeof(VRCAvatarDescriptor));
-        CustomGUI.ItalicLabel("Leave blank to use this object");
+
+        if (canOverrideTarget) {
+            CustomGUI.ItalicLabel("Leave blank to use this object");
+        } else {
+            CustomGUI.ItalicLabel("You cannot override this target");
+        }
+
         EditorGUI.EndDisabledGroup();
         
         CustomGUI.LineGap();
@@ -155,6 +161,55 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
 
                 EditorGUILayout.EndHorizontal();
             }
+        }
+    }
+
+    void RenderMaterialIssues() {
+        var component = target as VRCQuestifyerAvatar;
+        var vrcAvatarDescriptor = Utils.FindComponentInAncestor<VRCAvatarDescriptor>(component.transform);
+
+        List<Renderer> renderers = Utils.FindAllComponents<Renderer>(vrcAvatarDescriptor.transform);
+
+        foreach (var renderer in renderers) {
+            var materials = renderer.sharedMaterials;
+            var isInvalid = true;
+            
+            var switchMaterialsComponent = renderer.gameObject.GetComponent<VRCQuestifyerSwitchMaterials>();
+
+            if (switchMaterialsComponent != null) {
+                continue;
+            }
+
+            foreach (var material in materials) {
+                if (material == null || Common.GetIsMaterialUsingWhitelistedShader(material)) {
+                    continue;
+                }
+
+                isInvalid = true;
+            }
+
+            if (!isInvalid) {
+                continue;
+            }
+
+            EditorGUILayout.BeginHorizontal();
+
+            if (CustomGUI.TinyButton("Ping")) {
+                Utils.Ping(renderer.gameObject);
+            }
+
+            if (CustomGUI.TinyButton("View")) {
+                Utils.Inspect(renderer.gameObject);
+            }
+
+            if (CustomGUI.TinyButton("+Swi")) {
+                switchMaterialsComponent = renderer.gameObject.AddComponent<VRCQuestifyerSwitchMaterials>();
+                switchMaterialsComponent.Init();
+            }
+
+            CustomGUI.Label($"Renderer \"{renderer.gameObject.name}\" has at least one invalid material");
+
+            EditorGUILayout.EndHorizontal();
         }
     }
 
@@ -326,6 +381,7 @@ public class VRCQuestifyerAvatarEditor : VRCQuestifyerBaseEditor {
         CustomGUI.MediumLabel("Issues");
 
         RenderComponentValidationIssues();
+        RenderMaterialIssues();
         RenderConstraintIssues();
         RenderPhysBoneIssues();
         RenderContactIssues();

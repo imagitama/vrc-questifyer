@@ -24,6 +24,13 @@ public class VRCQuestifyerSwitchMaterials : VRCQuestifyerBase {
     public bool addQuestSuffix = true;
     public bool useToonShader = false;
 
+    public void Init() {
+        var transformToUse = this.overrideTarget != null ? this.overrideTarget : this.transform;
+        var renderer = transformToUse.GetComponent<Renderer>();
+
+        materialSwitches = new MaterialSwitch[renderer.sharedMaterials.Length];
+    }
+
     public override void Apply() {
         Debug.Log("VRCQuestifyer :: Switch materials - apply");
 
