@@ -9,7 +9,7 @@ It adds special components that you can add to your avatar or anything inside of
 - remove blacklisted components (eg. realtime lights)
 - rename objects
 
-Tested in Unity 2022.3.22f1 with VRC SDK 3.7.1 (Oct 2024).
+Tested in Unity 2022.3.22f1 with VRC SDK 3.10.4 and VRCFury 1.1369.0 (Aug 2026).
 
 ## Usage
 
